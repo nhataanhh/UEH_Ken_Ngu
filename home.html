@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trang Tổng Quan - Kén Ngủ V2</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="auth.js?v=8"></script>
+    <script src="notify.js?v=8"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f2f2f7; color: #1c1c1e; margin: 0; min-height: 100vh;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px;
+            -webkit-user-select: none; user-select: none; cursor: default;
+        }
+        .hub { width: 100%; max-width: 920px; }
+        .hub-head { text-align: center; margin-bottom: 8px; }
+        .hub-head h1 { margin: 0; font-size: 26px; font-weight: 700; }
+        .hub-head p { margin: 8px 0 0; color: #8e8e93; font-size: 14px; }
+
+        .logout-bar { display: flex; justify-content: flex-end; margin-bottom: 18px; }
+        .mini-btn { border: none; background: #e5e5ea; color: #1c1c1e; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+
+        .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 28px; }
+        @media (max-width: 760px) { .cards { grid-template-columns: 1fr; } }
+        .menu-card {
+            background: #fff; border-radius: 22px; padding: 30px 22px; text-align: center;
+            box-shadow: 0 6px 22px rgba(0,0,0,0.05); cursor: pointer; transition: transform .15s, box-shadow .15s;
+            border: 1px solid #ececf0;
+        }
+        .menu-card:hover { transform: translateY(-5px); box-shadow: 0 14px 30px rgba(0,0,0,0.1); }
+        .menu-icon { width: 70px; height: 70px; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 34px; margin: 0 auto 18px; }
+        .menu-card h3 { margin: 0 0 8px; font-size: 18px; font-weight: 700; }
+        .menu-card p { margin: 0; font-size: 13px; color: #8e8e93; line-height: 1.5; }
+
+        .c-blue { background: rgba(0,122,255,0.12); color: #007aff; }
+        .c-green { background: rgba(52,199,89,0.14); color: #1d9e54; }
+        .c-orange { background: rgba(255,149,0,0.14); color: #ff9500; }
+    </style>
+</head>
+<body>
+
+<div class="hub">
+    <div class="logout-bar">
+        <button class="mini-btn" onclick="KenAuth.logout()"><i class="ti ti-logout"></i> Đăng xuất</button>
+    </div>
+
+    <div class="hub-head">
+        <h1>Xin chào, <span id="lblName">Admin</span> 👋</h1>
+        <p>Hệ Thống Kén Ngủ Thông Minh V2 · Chọn một mục để tiếp tục</p>
+    </div>
+
+    <div class="cards">
+        <div class="menu-card" onclick="location.href='admin.html'">
+            <div class="menu-icon c-blue"><i class="ti ti-users-group"></i></div>
+            <h3>Quản lý tài khoản</h3>
+            <p>Thêm, xóa, cấp quyền và reset mật khẩu cho tài khoản sinh viên.</p>
+        </div>
+        <div class="menu-card" onclick="location.href='dashboard.html'">
+            <div class="menu-icon c-green"><i class="ti ti-dashboard"></i></div>
+            <h3>Dashboard theo dõi</h3>
+            <p>Giám sát chỉ số, trạng thái các kén trống/đang dùng và lịch sử hoạt động.</p>
+        </div>
+        <div class="menu-card" onclick="location.href='booking.html'">
+            <div class="menu-icon c-orange"><i class="ti ti-bed"></i></div>
+            <h3>Đặt kén</h3>
+            <p>Chọn kén trên sơ đồ N1 / N2 và đặt chỗ trực tiếp.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Trang tổng quan chỉ dành cho Admin
+    if (!KenAuth.requireAdmin()) { throw new Error("Chỉ Admin"); }
+    document.getElementById('lblName').innerText = sessionStorage.getItem("user_fullname") || sessionStorage.getItem("user_name") || "Admin";
+
+    // Thông báo pop-up khi có người đặt/hủy/check-in/check-out (chỉ Admin)
+    firebase.initializeApp(KEN_FIREBASE_CONFIG);
+    KenNotify.init(firebase.database());
+</script>
+</body>
+</html>

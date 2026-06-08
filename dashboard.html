@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bảng Giám Sát - Kén Ngủ V2</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    <script src="auth.js?v=9"></script>
+    <script src="pods.js?v=9"></script>
+    <script src="notify.js?v=8"></script>
+    <style>
+        :root {
+            --bg-main: #f4f5f9;
+            --bg-card: #ffffff;
+            --text-main: #1d1d1f;
+            --text-sub: #86868b;
+            --green: #34c759;
+            --yellow: #ff9500;
+            --red: #ff3b30;
+            --blue: #007aff;
+            --purple: #5856d6;
+            /* Bộ màu hệ thống Apple (đồng bộ biểu đồ) */
+            --accent-blue: #007aff;
+            --accent-green: #34c759;
+            --accent-red: #ff3b30;
+            --radius: 16px;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-main); color: var(--text-main); margin: 0; padding: 24px;
+            -webkit-user-select: none; -moz-user-select: none; user-select: none; cursor: default;
+        }
+        input, textarea { -webkit-user-select: text; user-select: text; cursor: text; }
+        .container { max-width: 1200px; margin: 0 auto; }
+
+        /* Header */
+        .header {
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+            background: var(--bg-card); padding: 16px 24px; border-radius: var(--radius);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.02); margin-bottom: 20px;
+        }
+        .header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+        .header p { margin: 4px 0 0 0; font-size: 13px; color: var(--text-sub); }
+        .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .live-status {
+            display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
+            color: var(--green); background: rgba(52,199,89,0.1); padding: 6px 12px; border-radius: 20px;
+        }
+        .pulse-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%{transform:scale(.9);opacity:1} 50%{transform:scale(1.2);opacity:.4} 100%{transform:scale(.9);opacity:1} }
+
+        .nav-btn {
+            border: none; border-radius: 10px; padding: 9px 14px; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: .15s; display: inline-flex; align-items: center; gap: 6px;
+            background: #e5e5ea; color: #1c1c1e;
+        }
+        .nav-btn:active { transform: scale(.97); }
+        .nav-btn-blue { background: var(--blue); color: #fff; }
+        .nav-btn-red { background: var(--red); color: #fff; }
+
+        /* Toolbar tuỳ chỉnh chỉ số */
+        .toolbar { display: flex; justify-content: flex-end; margin-bottom: 12px; position: relative; }
+        .metric-panel {
+            position: absolute; top: 44px; right: 0; z-index: 30; width: 260px;
+            background: var(--bg-card); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+            padding: 14px; display: none;
+        }
+        .metric-panel.open { display: block; }
+        .metric-panel h4 { margin: 0 0 10px; font-size: 13px; color: var(--text-sub); text-transform: uppercase; letter-spacing: .04em; }
+        .metric-panel label { display: flex; align-items: center; gap: 8px; font-size: 14px; padding: 6px 4px; cursor: pointer; }
+        .metric-panel input { width: 16px; height: 16px; }
+
+        /* Metrics */
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 22px; }
+        .metric-card {
+            background: var(--bg-card); padding: 18px; border-radius: var(--radius);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.02); display: flex; align-items: center; gap: 14px;
+        }
+        .metric-card.hidden { display: none; }
+        .metric-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+        .metric-info .label { font-size: 12px; color: var(--text-sub); font-weight: 500; }
+        .metric-info .value { font-size: 22px; font-weight: 700; margin-top: 3px; }
+        .metric-info .value small { font-size: 13px; font-weight: 400; }
+
+        /* Layout */
+        .grid-2 { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; }
+        @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+        .card { background: var(--bg-card); padding: 22px; border-radius: var(--radius); box-shadow: 0 4px 20px rgba(0,0,0,0.02); margin-bottom: 20px; }
+        .card-title { font-size: 13px; font-weight: 600; color: var(--text-sub); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+
+        /* Pod zones */
+        .zone-block { margin-bottom: 18px; }
+        .zone-head { font-size: 14px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .zone-head small { font-weight: 400; color: var(--text-sub); font-size: 12px; }
+        .pod-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+        @media (max-width: 560px) { .pod-row { grid-template-columns: repeat(2, 1fr); } }
+
+        /* Hình "kén" - viên nang */
+        .pod {
+            border-radius: 14px 14px 22px 22px / 14px 14px 40px 40px;
+            border: 1.5px solid transparent; padding: 14px 6px 12px; text-align: center;
+            cursor: pointer; transition: transform .12s, box-shadow .12s; position: relative;
+        }
+        .pod:hover { transform: translateY(-3px); box-shadow: 0 8px 18px rgba(0,0,0,0.08); }
+        .pod .cap { font-size: 26px; line-height: 1; }
+        .pod .pid { font-size: 12px; font-weight: 700; margin-top: 6px; }
+        .pod .pst { font-size: 10px; margin-top: 3px; font-weight: 600; }
+        .pod .ptime { font-size: 11px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; min-height: 14px; }
+        .pod.available { background: #eafaef; border-color: #97d8a8; }
+        .pod.available .cap, .pod.available .pst { color: #1d9e54; }
+        .pod.busy { background: #fdeceb; border-color: #f3a39d; }
+        .pod.busy .cap, .pod.busy .pst, .pod.busy .ptime { color: #c0392b; }
+        .pod.reserved { background: #fff3df; border-color: #f7c777; }
+        .pod.reserved .cap, .pod.reserved .pst, .pod.reserved .ptime { color: #9a6a00; }
+        .pod .pid { color: var(--text-main); }
+        .pod-act { margin-top: 8px; width: 100%; border: none; border-radius: 8px; padding: 6px 4px; font-size: 11px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+        .pod-act:active { transform: scale(0.96); }
+        .pod-in { background: var(--blue); color: #fff; }
+        .pod-out { background: var(--red); color: #fff; }
+
+        .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-sub); }
+        .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+        /* Activity list */
+        .log-container { max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .log-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px; background: var(--bg-main); border-radius: 12px; font-size: 13px; cursor: pointer; transition: .12s; border: 1px solid transparent; }
+        .log-item:hover { border-color: #d9d9e0; background: #eef0f5; }
+        .log-item i { font-size: 16px; margin-top: 2px; }
+        .log-title { font-weight: 500; }
+        .log-time { font-size: 11px; color: var(--text-sub); margin-top: 3px; }
+        .empty { text-align: center; color: var(--text-sub); padding: 24px; font-size: 13px; }
+
+        /* Modal */
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+        .overlay.open { display: flex; }
+        .modal { background: var(--bg-card); border-radius: 18px; width: 100%; max-width: 420px; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
+        .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .modal-head h3 { margin: 0; font-size: 17px; font-weight: 700; }
+        .modal-close { border: none; background: #e5e5ea; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 16px; }
+        .detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid #f0f0f3; font-size: 14px; }
+        .detail-row:last-child { border-bottom: none; }
+        .detail-row .k { color: var(--text-sub); }
+        .detail-row .v { font-weight: 600; text-align: right; }
+        .pill { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+        .pill-busy { background: rgba(255,59,48,0.12); color: var(--red); }
+        .pill-reserved { background: rgba(255,149,0,0.15); color: var(--yellow); }
+        .pill-done { background: rgba(52,199,89,0.15); color: #1d9e54; }
+        .pill-cancel { background: rgba(134,134,139,0.15); color: var(--text-sub); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <div>
+            <h1><i class="ti ti-dashboard"></i> Bảng Giám Sát Kén Ngủ</h1>
+            <p>Đang đăng nhập: <b id="lblWho">Admin</b> · <span id="lblDate"></span> · Cơ sở Nguyễn Văn Linh</p>
+        </div>
+        <div class="header-right">
+            <div class="live-status"><div class="pulse-dot"></div> TRỰC TIẾP</div>
+            <button class="nav-btn nav-btn-blue" onclick="KenAuth.goHome()"><i class="ti ti-home"></i> Trang chủ</button>
+            <button class="nav-btn nav-btn-red" onclick="KenAuth.logout()"><i class="ti ti-logout"></i> Đăng xuất</button>
+        </div>
+    </div>
+
+    <!-- Tuỳ chỉnh hiển thị chỉ số -->
+    <div class="toolbar">
+        <button class="nav-btn" onclick="toggleMetricPanel()"><i class="ti ti-adjustments"></i> Tuỳ chỉnh chỉ số</button>
+        <div class="metric-panel" id="metricPanel">
+            <h4>Hiện / Ẩn chỉ số</h4>
+            <div id="metricToggles"></div>
+        </div>
+    </div>
+
+    <!-- Metrics -->
+    <div class="metrics-grid" id="metricsGrid"></div>
+
+    <div class="grid-2">
+        <!-- Trạng thái kén -->
+        <div class="card">
+            <div class="card-title"><i class="ti ti-layout-grid"></i> Trạng thái kén theo khu</div>
+
+            <div class="zone-block">
+                <div class="zone-head"><i class="ti ti-books"></i> N1 — Thư viện <small>· Tầng 9</small></div>
+                <div class="pod-row" id="podRowN1"></div>
+            </div>
+            <div class="zone-block">
+                <div class="zone-head"><i class="ti ti-school"></i> N2 — Phòng tự học <small>· Tầng trệt</small></div>
+                <div class="pod-row" id="podRowN2"></div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item"><div class="legend-dot" style="background:#97d8a8"></div> Trống · bấm để đặt</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#f3a39d"></div> Đang dùng</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#f7c777"></div> Đã đặt chỗ</div>
+            </div>
+        </div>
+
+        <!-- Hoạt động gần đây -->
+        <div class="card">
+            <div class="card-title"><i class="ti ti-history"></i> Hoạt động gần đây <span style="text-transform:none;font-weight:400;color:var(--text-sub)">· bấm để xem chi tiết</span></div>
+            <div class="log-container" id="logList">
+                <div class="empty">Đang tải hoạt động...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Biểu đồ -->
+    <div class="grid-2">
+        <div class="card">
+            <div class="card-title"><i class="ti ti-chart-bar"></i> Lượt dùng theo giờ (7h–21h, hôm nay)</div>
+            <div style="position:relative;width:100%;height:220px;">
+                <canvas id="hourlyChart"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-title"><i class="ti ti-chart-pie"></i> Tỷ lệ gói thuê (hôm nay)</div>
+            <div style="position:relative;width:100%;height:220px;">
+                <canvas id="packageChart"></canvas>
+            </div>
+            <div class="legend" id="pkgLegend" style="justify-content:center;margin-top:14px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal chi tiết -->
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+        <div class="modal-head">
+            <h3 id="modalTitle">Chi tiết</h3>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+    // ===== Cổng bảo mật: Admin HOẶC tài khoản được cấp quyền Dashboard =====
+    if (!KenAuth.requireDashboard()) { throw new Error("Chặn truy cập Dashboard"); }
+
+    firebase.initializeApp(KEN_FIREBASE_CONFIG);
+    const database = firebase.database();
+    KenNotify.init(database); // thông báo pop-up (chỉ Admin)
+
+    // Theo dõi quyền realtime: nếu Admin thu hồi quyền Dashboard khi đang xem -> đá về trang đặt
+    try {
+        if (KenAuth.watchPermissions) KenAuth.watchPermissions(database, (can) => {
+            if (!can) { alert("Quyền truy cập Dashboard của bạn vừa bị thu hồi."); window.location.href = "booking.html"; }
+        });
+    } catch (e) { console.error("watchPermissions:", e); }
+    document.getElementById('lblWho').innerText = sessionStorage.getItem("user_fullname") || sessionStorage.getItem("user_name") || "Admin";
+
+    // Hiển thị thứ - ngày tháng năm hiện tại
+    (function showDate() {
+        const WD = ["Chủ Nhật","Thứ Hai","Thứ Ba","Thứ Tư","Thứ Năm","Thứ Sáu","Thứ Bảy"];
+        const d = new Date(); const p = n => String(n).padStart(2,'0');
+        document.getElementById('lblDate').innerText =
+            WD[d.getDay()] + ", " + p(d.getDate()) + "/" + p(d.getMonth()+1) + "/" + d.getFullYear();
+    })();
+
+    // Quyền xem danh tính: Admin HOẶC tài khoản được cấp quyền Dashboard -> xem đầy đủ tên + MSSV.
+    // (Người vào được trang này vốn đã có quyền, nên mặc định thấy đầy đủ.)
+    const canSeeIdentity = (sessionStorage.getItem("user_role") === "admin") || (sessionStorage.getItem("perm_dashboard") === "true");
+    const isAdmin = sessionStorage.getItem("user_role") === "admin";
+    const myMssv = sessionStorage.getItem("user_name") || "";
+    function nameFor(name, mssv) {
+        if (canSeeIdentity) return name || "—";
+        if (mssv && mssv === myMssv) return name || "—";
+        return KenAuth.maskStudent(mssv);
+    }
+    function mssvFor(mssv) {
+        if (canSeeIdentity || (mssv && mssv === myMssv)) return mssv || "—";
+        return KenAuth.maskStudent(mssv);
+    }
+
+    // ===== Khởi tạo 10 kén (tất cả đều TRỐNG) nếu chưa có dữ liệu =====
+    (async function seedIfEmpty() {
+        try {
+            const snap = await database.ref('pods').once('value');
+            if (snap.exists()) return;
+            const updates = {};
+            KEN_PODS.forEach(id => { updates['pods/' + id] = { zone: kenZoneOf(id), status: "available" }; });
+            await database.ref('pods').update(updates);
+        } catch (e) { console.error("Seed thất bại:", e); }
+    })();
+
+    // ===== Helpers =====
+    const STATUS_TEXT = { available: "Trống", busy: "Đang dùng", reserved: "Đã đặt" };
+    function fmtTime(ts) {
+        if (!ts) return "—";
+        const d = new Date(ts);
+        const p = n => String(n).padStart(2, '0');
+        return p(d.getHours()) + ":" + p(d.getMinutes()) + " · " + p(d.getDate()) + "/" + p(d.getMonth()+1);
+    }
+    function fmtMoney(v) {
+        if (v >= 1000000) return (v/1000000).toFixed(1) + "tr";
+        if (v >= 1000) return Math.round(v/1000) + "K";
+        return v + "đ";
+    }
+    function mmss(ms) {
+        if (ms < 0) ms = 0;
+        const s = Math.floor(ms/1000);
+        return String(Math.floor(s/60)).padStart(2,'0') + ":" + String(s%60).padStart(2,'0');
+    }
+    function remainMs(p) {
+        if (p.status === "busy") {
+            if (typeof p.countdown === "number") return p.countdown * 1000;  // kén phần cứng (ESP gửi lên)
+            if (p.endAt) return p.endAt - Date.now();                        // kén giả lập
+        }
+        if (p.status === "reserved" && p.reserveAt) return (p.reserveAt + KEN_RESERVE_HOLD_MS) - Date.now();
+        return null;
+    }
+    function isToday(ts) { const d = new Date(ts), n = new Date(); return d.toDateString() === n.toDateString(); }
+    function isThisMonth(ts) { const d = new Date(ts), n = new Date(); return d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear(); }
+
+    // ===== Chỉ số (metrics) có thể bật/tắt =====
+    const METRICS = [
+        { key:'total',        label:'Tổng kén',            icon:'ti-box',          color:'var(--blue)',   bg:'rgba(0,122,255,0.1)' },
+        { key:'available',    label:'Đang trống',          icon:'ti-circle-check', color:'var(--green)',  bg:'rgba(52,199,89,0.1)' },
+        { key:'busy',         label:'Đang sử dụng',        icon:'ti-bed',          color:'var(--red)',    bg:'rgba(255,59,48,0.1)' },
+        { key:'reserved',     label:'Đã đặt chỗ (giữ 1′)', icon:'ti-clock',   color:'var(--yellow)', bg:'rgba(255,149,0,0.12)' },
+        { key:'usageToday',   label:'Lượt dùng hôm nay',   icon:'ti-user-check',  color:'var(--purple)', bg:'rgba(88,86,214,0.1)' },
+        { key:'revenueToday', label:'Doanh thu hôm nay',   icon:'ti-cash',        color:'var(--green)',  bg:'rgba(52,199,89,0.1)' },
+        { key:'revenueMonth', label:'Doanh thu tháng này', icon:'ti-chart-line',  color:'#1d9e75',       bg:'rgba(29,158,117,0.1)' },
+        { key:'occupancy',    label:'Tỉ lệ lấp đầy',       icon:'ti-gauge',       color:'var(--yellow)', bg:'rgba(255,149,0,0.12)' },
+        { key:'avgDuration',  label:'Thời lượng TB',       icon:'ti-hourglass',   color:'var(--text-sub)', bg:'rgba(134,134,139,0.12)' },
+    ];
+    const VIS_KEY = "ken_metric_visibility";
+    let visibility = JSON.parse(localStorage.getItem(VIS_KEY) || "null");
+    if (!visibility) { visibility = {}; METRICS.forEach(m => visibility[m.key] = true); }
+
+    function buildMetricCards() {
+        const grid = document.getElementById('metricsGrid');
+        grid.innerHTML = "";
+        METRICS.forEach(m => {
+            const card = document.createElement('div');
+            card.className = 'metric-card' + (visibility[m.key] ? '' : ' hidden');
+            card.id = 'mc-' + m.key;
+            card.innerHTML =
+                `<div class="metric-icon" style="background:${m.bg};color:${m.color}"><i class="ti ${m.icon}"></i></div>
+                 <div class="metric-info"><div class="label">${m.label}</div><div class="value" id="mv-${m.key}">—</div></div>`;
+            grid.appendChild(card);
+        });
+        // Panel toggle checkboxes
+        const tg = document.getElementById('metricToggles');
+        tg.innerHTML = "";
+        METRICS.forEach(m => {
+            const lbl = document.createElement('label');
+            lbl.innerHTML = `<input type="checkbox" ${visibility[m.key] ? 'checked' : ''} onchange="setMetricVisible('${m.key}', this.checked)"> ${m.label}`;
+            tg.appendChild(lbl);
+        });
+    }
+    function setMetricVisible(key, on) {
+        visibility[key] = on;
+        localStorage.setItem(VIS_KEY, JSON.stringify(visibility));
+        document.getElementById('mc-' + key).classList.toggle('hidden', !on);
+    }
+    function toggleMetricPanel() { document.getElementById('metricPanel').classList.toggle('open'); }
+    document.addEventListener('click', e => {
+        const panel = document.getElementById('metricPanel');
+        if (panel.classList.contains('open') && !panel.contains(e.target) && !e.target.closest('.toolbar > .nav-btn')) {
+            panel.classList.remove('open');
+        }
+    });
+    buildMetricCards();
+
+    // ===== Render kén =====
+    let currentPods = {};
+    function renderPods() {
+        ['N1', 'N2'].forEach(zone => {
+            const row = document.getElementById('podRow' + zone);
+            row.innerHTML = "";
+            KEN_PODS.filter(id => kenZoneOf(id) === zone).forEach(id => {
+                const p = currentPods[id] || { status: "available" };
+                const st = p.status || "available";
+                const div = document.createElement('div');
+                div.className = 'pod ' + st;
+                div.title = (st === "available") ? "Bấm để đặt kén " + id : id + " · " + (p.user || "");
+
+                // Nút Check-in / Check-out ngay trên thẻ (kén giả lập; N1-01 do ESP xử lý)
+                let extra = "";
+                if (isAdmin && id !== KEN_HARDWARE_POD) {
+                    if (st === "reserved")
+                        extra = `<button class="pod-act pod-in" onclick="event.stopPropagation(); checkInPod('${id}')"><i class="ti ti-login-2"></i> Check-in</button>`;
+                    else if (st === "busy")
+                        extra = `<button class="pod-act pod-out" onclick="event.stopPropagation(); doCheckout('${id}')"><i class="ti ti-logout-2"></i> Check-out</button>`;
+                }
+
+                div.innerHTML =
+                    `<div class="cap"><i class="ti ti-capsule"></i></div>
+                     <div class="pid">${id}</div>
+                     <div class="pst">${STATUS_TEXT[st] || st}</div>
+                     <div class="ptime" id="pt-${id}"></div>${extra}`;
+                div.onclick = () => onPodClick(id);
+                row.appendChild(div);
+            });
+        });
+        tickTimers();
+    }
+
+    const autoCheckedOut = new Set();
+    function tickTimers() {
+        KEN_PODS.forEach(id => {
+            const p = currentPods[id];
+            const el = document.getElementById('pt-' + id);
+            if (el) {
+                if (!p) el.textContent = "";
+                else { const r = remainMs(p); el.textContent = (r === null) ? "" : ((r <= 0 && p.status === "reserved") ? "Hết giữ" : mmss(r)); }
+            }
+            // Kén GIẢ LẬP: hết giờ đếm ngược -> tự check-out (N1-01 do mạch ESP tự xử lý)
+            if (isAdmin && p && p.status === "busy" && id !== KEN_HARDWARE_POD && p.endAt && Date.now() >= p.endAt) {
+                const k = id + "_" + p.checkinAt;
+                if (!autoCheckedOut.has(k)) { autoCheckedOut.add(k); doCheckout(id); }
+            }
+            // Kén GIẢ LẬP: hết hạn giữ chỗ 1' mà chưa ai check-in -> tự trả về TRỐNG
+            // (chống kẹt "Đã đặt / Hết giữ" mãi khi người đặt rời trang. N1-01 do ESP tự lo.)
+            if (isAdmin && p && p.status === "reserved" && id !== KEN_HARDWARE_POD &&
+                p.reserveAt && Date.now() > (p.reserveAt + KEN_RESERVE_HOLD_MS)) {
+                const k = "rel_" + id + "_" + p.reserveAt;
+                if (!autoCheckedOut.has(k)) { autoCheckedOut.add(k); database.ref('pods/' + id).set({ zone: kenZoneOf(id), status: "available" }); }
+            }
+        });
+    }
+    setInterval(tickTimers, 1000);
+
+    function onPodClick(id) {
+        const p = currentPods[id] || { status: "available" };
+        if (p.status === "available") {
+            // Chuyển sang trang đặt với kén đã chọn
+            window.location.href = "booking.html?pod=" + encodeURIComponent(id);
+            return;
+        }
+        // Kén đang dùng / đã đặt -> xem thông tin
+        const r = remainMs(p);
+        const stPill = p.status === "busy"
+            ? '<span class="pill pill-busy">ĐANG DÙNG</span>'
+            : '<span class="pill pill-reserved">ĐÃ ĐẶT</span>';
+
+        // Hành động: N1-01 do phần cứng điều khiển; kén giả lập có nút Check-in / Check-out
+        let footer = "";
+        if (id === KEN_HARDWARE_POD) {
+            footer = `<div style="text-align:center;font-size:13px;color:var(--text-sub);background:var(--bg-main);padding:10px;border-radius:10px"><i class="ti ti-cpu"></i> Kén phần cứng — điều khiển bằng cảm biến ESP (tự đếm ngược)</div>`;
+            // Admin có thể giải phóng thủ công nếu kén bị kẹt (vd ESP mất mạng lúc đang giữ chỗ)
+            if (isAdmin && (p.status === "reserved" || p.status === "busy")) {
+                footer += `<button class="nav-btn nav-btn-red" style="width:100%;justify-content:center;margin-top:8px" onclick="forceRelease('${id}')"><i class="ti ti-lock-open"></i> Giải phóng kén (admin)</button>`;
+            }
+        } else if (isAdmin && p.status === "reserved") {
+            footer = `<button class="nav-btn nav-btn-blue" style="width:100%;justify-content:center" onclick="checkInPod('${id}')"><i class="ti ti-login-2"></i> Check-in (bắt đầu đếm ngược)</button>`;
+        } else if (isAdmin && p.status === "busy") {
+            footer = `<button class="nav-btn nav-btn-red" style="width:100%;justify-content:center" onclick="doCheckout('${id}')"><i class="ti ti-logout-2"></i> Check-out (kết thúc)</button>`;
+        }
+
+        showModal("Kén " + id, [
+            ["Trạng thái", stPill, true],
+            ["Người dùng", nameFor(p.user, p.mssv)],
+            ["MSSV", mssvFor(p.mssv)],
+            ["Thời lượng", (p.duration ? p.duration + " giây" : "—")],
+            ["Thời gian còn lại", r !== null ? mmss(r) : "—"],
+            [p.status === "busy" ? "Giờ check-in" : "Giờ đặt", fmtTime(p.status === "busy" ? p.checkinAt : p.reserveAt)],
+        ], footer);
+    }
+
+    // ===== Admin giải phóng kén thủ công về 'available' (gỡ kẹt) =====
+    function forceRelease(id) {
+        if (!confirm("Giải phóng kén " + id + " về trạng thái TRỐNG?")) return;
+        database.ref('pods/' + id).set({ zone: kenZoneOf(id), status: "available" });
+        closeModal();
+    }
+
+    // ===== Check-in kén GIẢ LẬP -> 'busy' (bắt đầu đếm ngược theo thời lượng đã chọn) =====
+    function checkInPod(id) {
+        const p = currentPods[id]; if (!p) return;
+        const now = Date.now();
+        const dur = Number(p.duration) || 0;
+        database.ref('pods/' + id).update({ status: "busy", checkinAt: now, endAt: now + dur * 1000 });
+        // Ghi nhật ký để có feed + thông báo pop-up check-in
+        database.ref('activity_log').push().set({
+            pod: id, zone: kenZoneOf(id), user: p.user || "", mssv: p.mssv || "",
+            durationMin: dur, price: kenPriceOf(dur), bookAt: now, checkinAt: now, status: "busy"
+        });
+        closeModal();
+    }
+
+    // ===== Check-out -> 'available' (thủ công hoặc tự động khi hết giờ) =====
+    // Dùng khoá xác định (done_pod_checkinAt) nên không bị trùng dù gọi nhiều lần / nhiều máy.
+    function doCheckout(id) {
+        const p = currentPods[id]; if (!p || p.status !== "busy") return;
+        const now = Date.now();
+        database.ref('pods/' + id).set({ zone: kenZoneOf(id), status: "available" });
+        if (p.checkinAt) database.ref('usage_log/' + id + '_' + p.checkinAt + '/checkoutAt').set(now);
+        database.ref('activity_log/done_' + id + '_' + (p.checkinAt || now)).set({
+            pod: id, zone: kenZoneOf(id), user: p.user || "", mssv: p.mssv || "",
+            durationMin: Number(p.duration) || 0, price: kenPriceOf(Number(p.duration) || 0),
+            bookAt: p.checkinAt || now, checkinAt: p.checkinAt || null, checkoutAt: now, status: "completed"
+        });
+        closeModal();
+    }
+
+    database.ref('pods').on('value', snap => {
+        currentPods = snap.val() || {};
+        renderPods();
+        computeMetricsFromPods();
+        ensureUsageLogged();      // kén nào vừa chuyển 'busy' -> ghi 1 lượt dùng
+        handleHardwareEvents();   // N1-01 (ESP): ghi feed + bật thông báo khi check-in/out
+    });
+
+    // Phát hiện N1-01 (kén phần cứng) đổi trạng thái để ghi nhật ký & thông báo (idempotent)
+    let hwPrevStatus = null, hwBusy = null;
+    const hwInWritten = new Set();
+    function handleHardwareEvents() {
+        const p = currentPods[KEN_HARDWARE_POD]; if (!p) return;
+        const st = p.status || "available";
+        // Vào busy + đã có checkinAt -> ghi lượt check-in (1 lần / phiên)
+        if (st === "busy" && p.checkinAt) {
+            hwBusy = { checkinAt: p.checkinAt, user: p.user || "", mssv: p.mssv || "", duration: Number(p.duration) || 0 };
+            const key = 'in_' + KEN_HARDWARE_POD + '_' + p.checkinAt;
+            if (!hwInWritten.has(key)) {
+                hwInWritten.add(key);
+                database.ref('activity_log/' + key).set({
+                    pod: KEN_HARDWARE_POD, zone: kenZoneOf(KEN_HARDWARE_POD), user: hwBusy.user, mssv: hwBusy.mssv,
+                    durationMin: hwBusy.duration, price: kenPriceOf(hwBusy.duration),
+                    bookAt: hwBusy.checkinAt, checkinAt: hwBusy.checkinAt, status: "busy"
+                });
+            }
+        }
+        // busy -> available: ghi lượt check-out (hoàn tất)
+        if (hwPrevStatus === "busy" && st === "available" && hwBusy) {
+            database.ref('activity_log/done_' + KEN_HARDWARE_POD + '_' + hwBusy.checkinAt).set({
+                pod: KEN_HARDWARE_POD, zone: kenZoneOf(KEN_HARDWARE_POD), user: hwBusy.user, mssv: hwBusy.mssv,
+                durationMin: hwBusy.duration, price: kenPriceOf(hwBusy.duration),
+                bookAt: hwBusy.checkinAt, checkinAt: hwBusy.checkinAt, checkoutAt: Date.now(), status: "completed"
+            });
+            hwBusy = null;
+        }
+        hwPrevStatus = st;
+    }
+
+    function computeMetricsFromPods() {
+        let avail = 0, busy = 0, reserved = 0;
+        KEN_PODS.forEach(id => {
+            const s = (currentPods[id] && currentPods[id].status) || "available";
+            if (s === "busy") busy++; else if (s === "reserved") reserved++; else avail++;
+        });
+        const total = KEN_PODS.length;
+        document.getElementById('mv-total').textContent = total;
+        document.getElementById('mv-available').textContent = avail;
+        document.getElementById('mv-busy').textContent = busy;
+        document.getElementById('mv-reserved').textContent = reserved;
+        document.getElementById('mv-occupancy').innerHTML = Math.round((busy + reserved) / total * 100) + "<small>%</small>";
+    }
+
+    // ===== Activity log -> CHỈ dùng cho feed "Hoạt động gần đây" =====
+    database.ref('activity_log').limitToLast(200).on('value', snap => {
+        const data = snap.val() || {};
+        const items = Object.keys(data).map(k => ({ id: k, ...data[k] }));
+        items.sort((a, b) => (b.bookAt || 0) - (a.bookAt || 0));
+        renderActivityFeed(items);
+    });
+
+    function actionLabel(it) {
+        const who = nameFor(it.user, it.mssv);
+        if (it.status === "completed") return { icon: "ti-moon", color: "#1d9e54", text: `${who} hoàn tất ${it.durationMin} giây tại ${it.pod}` };
+        if (it.status === "cancelled") return { icon: "ti-trash-x", color: "var(--text-sub)", text: `Huỷ giữ chỗ ${it.pod} (${who})` };
+        if (it.status === "busy") return { icon: "ti-bed", color: "var(--red)", text: `${who} check-in kén ${it.pod}` };
+        return { icon: "ti-calendar-plus", color: "var(--yellow)", text: `${who} đặt chỗ kén ${it.pod}` };
+    }
+
+    function renderActivityFeed(items) {
+        const list = document.getElementById('logList');
+        if (items.length === 0) { list.innerHTML = '<div class="empty">Chưa có hoạt động nào.</div>'; return; }
+        list.innerHTML = "";
+        items.slice(0, 25).forEach(it => {
+            const a = actionLabel(it);
+            const el = document.createElement('div');
+            el.className = 'log-item';
+            el.innerHTML =
+                `<i class="ti ${a.icon}" style="color:${a.color}"></i>
+                 <div><div class="log-title">${a.text}</div>
+                 <div class="log-time">${fmtTime(it.bookAt)} · MSSV ${mssvFor(it.mssv)}</div></div>`;
+            el.onclick = () => showActivityDetail(it);
+            list.appendChild(el);
+        });
+    }
+
+    function showActivityDetail(it) {
+        const statusPill = {
+            completed: '<span class="pill pill-done">HOÀN TẤT</span>',
+            cancelled: '<span class="pill pill-cancel">ĐÃ HUỶ</span>',
+            busy: '<span class="pill pill-busy">ĐANG DÙNG</span>',
+            reserved: '<span class="pill pill-reserved">ĐÃ ĐẶT</span>',
+        }[it.status] || it.status;
+
+        let used = "—";
+        if (it.checkinAt && it.checkoutAt) {
+            used = Math.round((it.checkoutAt - it.checkinAt) / 1000) + " giây";
+        } else if (it.durationMin) {
+            used = it.durationMin + " giây (đăng ký)";
+        }
+
+        showModal("Lịch sử kén " + it.pod, [
+            ["Trạng thái", statusPill, true],
+            ["Người đặt", nameFor(it.user, it.mssv)],
+            ["MSSV", mssvFor(it.mssv)],
+            ["Khu vực", (KEN_ZONES[it.zone] ? KEN_ZONES[it.zone].name : it.zone) || "—"],
+            ["Thời lượng sử dụng", used],
+            ["Giờ đặt", fmtTime(it.bookAt)],
+            ["Giờ active (check-in)", fmtTime(it.checkinAt)],
+            ["Giờ deactive (check-out)", fmtTime(it.checkoutAt)],
+            ["Doanh thu", it.price ? fmtMoney(it.price) : "—"],
+        ]);
+    }
+
+    // ===== USAGE LOG: nguồn dữ liệu cho doanh thu / lượt dùng / 2 biểu đồ =====
+    // Mỗi khi 1 kén chuyển 'busy', ghi 1 bản ghi lượt dùng (khoá = pod + giờ check-in nên idempotent,
+    // không trùng dù mở dashboard ở nhiều máy).
+    let usageData = {};
+    const writtenUsage = new Set();
+    function ensureUsageLogged() {
+        KEN_PODS.forEach(id => {
+            const p = currentPods[id];
+            if (!p || p.status !== "busy") return;
+            // N1-01 (ESP) không tự ghi checkinAt -> web đóng dấu giúp 1 lần (transaction tránh tranh chấp)
+            if (!p.checkinAt) {
+                if (id === KEN_HARDWARE_POD)
+                    database.ref('pods/' + id + '/checkinAt').transaction(cur => (cur === null ? Date.now() : undefined));
+                return;
+            }
+            const key = id + "_" + p.checkinAt;
+            if (writtenUsage.has(key) || usageData[key]) return;
+            writtenUsage.add(key);
+            const dur = Number(p.duration) || 0;
+            database.ref('usage_log/' + key).set({
+                pod: id, zone: kenZoneOf(id), user: p.user || "", mssv: p.mssv || "",
+                durationSec: dur, price: kenPriceOf(dur), checkinAt: p.checkinAt
+            });
+        });
+    }
+
+    // 3 gói thuê — màu theo hệ thống Apple
+    const PKG = [
+        { sec: 15, label: '15 giây · 4K',  hex: '#007aff' }, // --accent-blue
+        { sec: 30, label: '30 giây · 8K',  hex: '#34c759' }, // --accent-green
+        { sec: 45, label: '45 giây · 10K', hex: '#ff3b30' }, // --accent-red
+    ];
+
+    let hourlyChart = null, packageChart = null;
+    database.ref('usage_log').limitToLast(1000).on('value', snap => {
+        usageData = snap.val() || {};
+        const items = Object.values(usageData);
+        const today = items.filter(it => isToday(it.checkinAt));
+        computeUsageMetrics(today, items);
+        renderHourlyChart(today);
+        renderPackageChart(today);
+    });
+
+    function computeUsageMetrics(today, all) {
+        const revToday = today.reduce((s, it) => s + (it.price || 0), 0);
+        const revMonth = all.filter(it => isThisMonth(it.checkinAt)).reduce((s, it) => s + (it.price || 0), 0);
+        const totalSec = today.reduce((s, it) => s + (it.durationSec || 0), 0);
+        const avg = today.length ? Math.round(totalSec / today.length) : 0;
+
+        document.getElementById('mv-usageToday').textContent = today.length;
+        document.getElementById('mv-revenueToday').innerHTML = fmtMoney(revToday).replace(/(K|tr|đ)/, '<small>$1</small>');
+        document.getElementById('mv-revenueMonth').innerHTML = fmtMoney(revMonth).replace(/(K|tr|đ)/, '<small>$1</small>');
+        document.getElementById('mv-avgDuration').innerHTML = avg + "<small> giây</small>";
+    }
+
+    // Biểu đồ cột: lượt dùng theo giờ 7h–21h (đếm theo giờ check-in)
+    function renderHourlyChart(today) {
+        const hours = [7,8,9,10,11,12,13,14,15,16,17,18,19,20,21];
+        const counts = hours.map(() => 0);
+        today.forEach(it => {
+            const idx = hours.indexOf(new Date(it.checkinAt).getHours());
+            if (idx >= 0) counts[idx]++;
+        });
+        if (typeof Chart === "undefined") return;
+        if (hourlyChart) { hourlyChart.data.datasets[0].data = counts; hourlyChart.update(); return; }
+        hourlyChart = new Chart(document.getElementById('hourlyChart'), {
+            type: 'bar',
+            data: { labels: hours.map(h => h + "h"), datasets: [{ data: counts, backgroundColor: '#007aff', borderRadius: 4, maxBarThickness: 26 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y + ' lượt' } } },
+                scales: { x: { grid: { display: false }, ticks: { font: { size: 11 } } }, y: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 } } } }
+            }
+        });
+    }
+
+    // Biểu đồ tròn: tỷ lệ 3 gói thuê 15s/30s/45s (xanh dương / xanh lá / đỏ)
+    function renderPackageChart(today) {
+        const counts = PKG.map(pk => today.filter(it => Number(it.durationSec) === pk.sec).length);
+        const total = counts.reduce((a, b) => a + b, 0);
+        document.getElementById('pkgLegend').innerHTML = PKG.map((pk, i) => {
+            const pct = total ? Math.round(counts[i] / total * 100) : 0;
+            return `<div class="legend-item"><div class="legend-dot" style="background:${pk.hex}"></div> ${pk.label}: <b>${counts[i]}</b> (${pct}%)</div>`;
+        }).join("");
+        if (typeof Chart === "undefined") return;
+        if (packageChart) { packageChart.data.datasets[0].data = counts; packageChart.update(); return; }
+        packageChart = new Chart(document.getElementById('packageChart'), {
+            type: 'doughnut',
+            data: { labels: PKG.map(p => p.label), datasets: [{ data: counts, backgroundColor: PKG.map(p => p.hex), borderWidth: 2, borderColor: '#ffffff' }] },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: '62%',
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.label}: ${c.parsed} lượt` } } }
+            }
+        });
+    }
+
+    // ===== Modal =====
+    function showModal(title, rows, footer) {
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('modalBody').innerHTML = rows.map(r =>
+            `<div class="detail-row"><span class="k">${r[0]}</span><span class="v">${r[2] ? r[1] : escapeHtml(r[1])}</span></div>`
+        ).join("") + (footer ? `<div style="margin-top:16px">${footer}</div>` : "");
+        document.getElementById('overlay').classList.add('open');
+    }
+    function closeModal() { document.getElementById('overlay').classList.remove('open'); }
+    function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+    document.addEventListener('keydown', e => { if (e.key === "Escape") closeModal(); });
+</script>
+</body>
+</html>

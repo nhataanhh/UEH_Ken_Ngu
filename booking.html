@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Đặt Kén - Kén Ngủ V2</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="auth.js?v=9"></script>
+    <script src="pods.js?v=9"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f2f2f7; margin: 0; padding: 18px; min-height: 100vh;
+            -webkit-user-select: none; user-select: none; cursor: default;
+        }
+        input, textarea, select { -webkit-user-select: text; user-select: text; cursor: auto; }
+        .container { width: 100%; max-width: 460px; margin: 0 auto; }
+
+        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+        .who { font-size: 13px; color: #8e8e93; font-weight: 600; }
+        .top-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .mini-btn { border: none; background: #e5e5ea; color: #1c1c1e; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+        .mini-btn.blue { background: #007aff; color: #fff; }
+
+        .card { background: #fff; padding: 22px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 16px; }
+        h2 { margin: 0 0 4px; font-size: 19px; color: #1c1c1e; }
+        .sub { font-size: 13px; color: #8e8e93; margin-bottom: 16px; }
+
+        /* Pod picker */
+        .floor-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+        .floor-tab { flex: 1; padding: 8px; font-size: 13px; font-weight: 600; border: 1px solid #e5e5ea; background: #fff; color: #8e8e93; border-radius: 10px; cursor: pointer; }
+        .floor-tab.active { background: #007aff; color: #fff; border-color: #007aff; }
+        .pick-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+        @media (max-width: 420px) { .pick-grid { grid-template-columns: repeat(3, 1fr); } }
+        .pick {
+            border-radius: 12px 12px 18px 18px; border: 1.5px solid transparent; padding: 12px 4px 10px;
+            text-align: center; cursor: pointer; transition: transform .1s;
+        }
+        .pick:hover { transform: translateY(-2px); }
+        .pick .cap { font-size: 22px; }
+        .pick .pid { font-size: 11px; font-weight: 700; margin-top: 4px; color: #1c1c1e; }
+        .pick .pst { font-size: 9px; font-weight: 600; margin-top: 2px; }
+        .pick.available { background: #eafaef; border-color: #97d8a8; }
+        .pick.available .cap, .pick.available .pst { color: #1d9e54; }
+        .pick.busy { background: #fdeceb; border-color: #f3a39d; cursor: not-allowed; }
+        .pick.busy .cap, .pick.busy .pst { color: #c0392b; }
+        .pick.reserved { background: #fff3df; border-color: #f7c777; cursor: not-allowed; }
+        .pick.reserved .cap, .pick.reserved .pst { color: #9a6a00; }
+        .pick.sel { background: #e6f1fb; border-color: #007aff; box-shadow: 0 0 0 2px rgba(0,122,255,0.25); }
+        .pick.sel .cap, .pick.sel .pst { color: #0c447c; }
+
+        /* Selected pod big capsule */
+        .ken-box {
+            width: 150px; height: 200px; border-radius: 75px; margin: 4px auto 16px; display: flex;
+            flex-direction: column; align-items: center; justify-content: center; color: #fff; font-weight: bold;
+            transition: all .4s ease; box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        .ken-box .big { font-size: 34px; }
+        .ken-box .lbl { font-size: 16px; margin-top: 6px; }
+        .ken-box.available { background: linear-gradient(135deg,#34c759,#28cd41); }
+        .ken-box.reserved { background: linear-gradient(135deg,#ffcc00,#ffb300); color: #1c1c1e; }
+        .ken-box.busy { background: linear-gradient(135deg,#ff3b30,#ff2d55); }
+        .ken-box.none { background: linear-gradient(135deg,#c7c7cc,#aeaeb2); }
+
+        .info-text { font-size: 15px; font-weight: 500; margin: 8px 0; color: #3a3a3c; text-align: center; min-height: 22px; }
+        .timer-display { font-size: 20px; font-weight: bold; margin: 8px 0; color: #ff3b30; text-align: center; min-height: 26px; }
+
+        .form-row { margin: 12px 0; text-align: left; }
+        .form-row label { font-size: 13px; font-weight: 600; color: #8e8e93; display: block; margin-bottom: 5px; }
+        .form-row input, .form-row select {
+            width: 100%; padding: 12px; border: 1px solid #c7c7cc; border-radius: 10px; font-size: 16px;
+            outline: none; background: #fafafa;
+        }
+        .form-row input:focus { border-color: #007aff; background: #fff; }
+
+        .time-options { display: flex; gap: 8px; }
+        .time-btn { flex: 1; padding: 12px; border: none; background: #e5e5ea; color: #1c1c1e; font-weight: 600; border-radius: 12px; cursor: pointer; transition: .2s; }
+        .time-btn.active { background: #007aff; color: #fff; }
+
+        .action-btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 12px; transition: .2s; }
+        .btn-confirm { background: #007aff; color: #fff; }
+        .btn-confirm:disabled { background: #c7c7cc; cursor: not-allowed; }
+        .btn-cancel { background: #ff3b30; color: #fff; }
+        .booker-info { background: #f2f7ff; border: 1px solid #cfe0ff; color: #0c447c; border-radius: 12px; padding: 10px 12px; font-size: 13px; margin-bottom: 4px; line-height: 1.5; }
+        .booker-info b { font-weight: 700; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="topbar">
+        <span class="who" id="lblWho"></span>
+        <span class="top-actions">
+            <button id="btnGoHome" class="mini-btn hidden" onclick="KenAuth.goHome()">Trang chủ</button>
+            <button id="btnGoDashboard" class="mini-btn blue hidden" onclick="location.href='dashboard.html'">Dashboard</button>
+            <button class="mini-btn" onclick="changeMyPassword()">Đổi mật khẩu</button>
+            <button class="mini-btn" onclick="KenAuth.logout()">Đăng xuất</button>
+        </span>
+    </div>
+
+    <!-- Chọn kén -->
+    <div class="card" id="pickerCard">
+        <h2>Chọn kén trên sơ đồ</h2>
+        <div class="sub">Bấm vào kén còn trống (xanh) để đặt</div>
+        <div class="floor-tabs">
+            <button class="floor-tab active" id="ftN1" onclick="switchFloor('N1')">N1 · Thư viện</button>
+            <button class="floor-tab" id="ftN2" onclick="switchFloor('N2')">N2 · Phòng tự học</button>
+        </div>
+        <div class="pick-grid" id="pickGrid"></div>
+    </div>
+
+    <!-- Đặt kén -->
+    <div class="card">
+        <h2 id="podTitle">Chưa chọn kén</h2>
+        <div class="sub" id="podZone">Vui lòng chọn một kén còn trống</div>
+
+        <div id="kenBox" class="ken-box none">
+            <span class="big"><i class="ti ti-capsule"></i></span>
+            <span class="lbl" id="txtStatus">—</span>
+        </div>
+
+        <div class="info-text" id="lblSelection"></div>
+        <div class="timer-display" id="timerValue"></div>
+
+        <div id="formArea">
+            <div class="booker-info" id="bookerInfo"></div>
+            <div class="form-row">
+                <label>THỜI LƯỢNG NGỦ</label>
+                <div class="time-options" id="timeOptions">
+                    <button class="time-btn active" onclick="selectDuration(15,this)">15 giây</button>
+                    <button class="time-btn" onclick="selectDuration(30,this)">30 giây</button>
+                    <button class="time-btn" onclick="selectDuration(45,this)">45 giây</button>
+                </div>
+            </div>
+            <div class="form-row">
+                <label>GIÁ DỊCH VỤ</label>
+                <input type="text" id="txtPrice" value="4.000 VNĐ / 15 giây" readonly>
+            </div>
+        </div>
+
+        <button id="btnConfirm" class="action-btn btn-confirm" disabled onclick="xacNhanDat()">Xác Nhận Đặt Kén</button>
+        <button id="btnCheckin" class="action-btn hidden" style="background:#34c759;color:#fff" onclick="checkInNow()"><i class="ti ti-login-2"></i> Check-in (Vào Kén)</button>
+        <button id="btnCancel" class="action-btn btn-cancel hidden" onclick="huyLenhLapTuc()">Huỷ Giữ Chỗ (Cancel)</button>
+    </div>
+</div>
+
+<script>
+    // ===== Cổng bảo mật: mọi tài khoản đã đăng nhập đều được đặt kén =====
+    if (!KenAuth.requireLogin()) { throw new Error("Chưa đăng nhập"); }
+
+    // ===== Biến trạng thái khai báo NGAY ĐẦU (tránh lỗi TDZ nếu đoạn sau có sự cố) =====
+    let tempDuration = 15;
+    let selectedPod = null;          // kén đang chọn để đặt
+    let currentFloor = "N1";
+    let currentPods = {};
+    let reserveTimer = null;
+    let activityKey = null;          // khoá bản ghi activity_log của lần đặt hiện tại
+
+    firebase.initializeApp(KEN_FIREBASE_CONFIG);
+    const database = firebase.database();
+
+    // Top bar — chào mừng bằng HỌ TÊN
+    const myMssv = sessionStorage.getItem("user_name") || "";
+    const myName = sessionStorage.getItem("user_fullname") || myMssv;
+    document.getElementById('lblWho').innerText = "Xin chào, " + myName;
+    if (sessionStorage.getItem("user_role") === "admin") document.getElementById('btnGoHome').classList.remove('hidden');
+    if (sessionStorage.getItem("perm_dashboard") === "true") document.getElementById('btnGoDashboard').classList.remove('hidden');
+
+    // Theo dõi quyền Dashboard realtime: Admin cấp/thu hồi -> nút hiện/ẩn ngay
+    try {
+        if (KenAuth.watchPermissions) KenAuth.watchPermissions(database, (can) => {
+            document.getElementById('btnGoDashboard').classList.toggle('hidden', !can);
+        });
+    } catch (e) { console.error("watchPermissions:", e); }
+
+    // Người đặt mặc định = chính tài khoản đang đăng nhập (không cần nhập tay)
+    document.getElementById('bookerInfo').innerHTML =
+        "Người đặt: <b>" + myName + "</b><br>MSSV: <b>" + myMssv + "</b>";
+
+    // Ai được xem danh tính người khác? Admin hoặc tài khoản được cấp quyền Dashboard.
+    const canSeeIdentity = (sessionStorage.getItem("user_role") === "admin") || (sessionStorage.getItem("perm_dashboard") === "true");
+
+    // ID thiết bị (để xác định ai là chủ lệnh giữ chỗ -> được Cancel)
+    let deviceId = localStorage.getItem('ken_device_id');
+    if (!deviceId) { deviceId = 'dev_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10); localStorage.setItem('ken_device_id', deviceId); }
+
+    // Pod chỉ định sẵn từ URL (?pod=N1-03)
+    const urlPod = new URLSearchParams(location.search).get('pod');
+
+    function priceLabel(sec) { return kenPriceOf(sec).toLocaleString('vi-VN') + " VNĐ / " + sec + " giây"; }
+
+    // Mỗi người chỉ được giữ/dùng 1 kén. Tìm kén mà CHÍNH người này đang giữ chỗ hoặc đang dùng.
+    // Trả về mã kén (vd "N1-03") hoặc null nếu chưa giữ kén nào.
+    // Chủ kén = TÀI KHOẢN đăng nhập (mssv), KHÔNG dùng deviceId vì nhiều tài khoản
+    // có thể đăng nhập trên cùng 1 trình duyệt -> dùng chung deviceId gây nhận nhầm chủ.
+    function isMyPod(p) { return !!(p && p.mssv && myMssv && p.mssv === myMssv); }
+
+    function myActivePod() {
+        for (const id of KEN_PODS) {
+            const p = currentPods[id];
+            if (!p) continue;
+            if (isMyPod(p) && (p.status === "reserved" || p.status === "busy")) return id;
+        }
+        return null;
+    }
+
+    function selectDuration(sec, btn) {
+        tempDuration = sec;
+        document.querySelectorAll('#timeOptions .time-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('txtPrice').value = priceLabel(sec);
+    }
+
+    function switchFloor(zone) {
+        currentFloor = zone;
+        document.getElementById('ftN1').classList.toggle('active', zone === "N1");
+        document.getElementById('ftN2').classList.toggle('active', zone === "N2");
+        renderPicker();
+    }
+
+    function renderPicker() {
+        const grid = document.getElementById('pickGrid');
+        grid.innerHTML = "";
+        KEN_PODS.filter(id => kenZoneOf(id) === currentFloor).forEach(id => {
+            const p = currentPods[id] || { status: "available" };
+            const st = p.status || "available";
+            const isSel = selectedPod === id;
+            // Kén này có phải của chính mình đang giữ/dùng không?
+            const mineHold = (st === "reserved" || st === "busy") && isMyPod(p);
+            const cls = isSel ? "sel" : st;
+            const div = document.createElement('div');
+            div.className = "pick " + cls;
+            let label = isSel ? "Đang chọn" : ({available:"Trống",busy:"Có người",reserved:"Đã đặt"}[st] || st);
+            if (mineHold && !isSel) label = "Của bạn";
+            div.innerHTML =
+                `<div class="cap"><i class="ti ti-capsule"></i></div>
+                 <div class="pid">${id}</div>
+                 <div class="pst">${label}</div>`;
+            // Bấm được: kén trống, kén đang chọn, hoặc kén của chính mình (để quay về huỷ)
+            if (st === "available" || isSel || mineHold) div.onclick = () => choosePod(id);
+            grid.appendChild(div);
+        });
+    }
+
+    function choosePod(id) {
+        selectedPod = id;
+        renderPicker();
+        renderSelectedPod();
+    }
+
+    // Hiển thị kén đang chọn (đồng bộ realtime trạng thái của chính kén đó)
+    function renderSelectedPod() {
+        const box = document.getElementById('kenBox');
+        const txtStatus = document.getElementById('txtStatus');
+        const podTitle = document.getElementById('podTitle');
+        const podZone = document.getElementById('podZone');
+        const lblSelection = document.getElementById('lblSelection');
+        const timerValue = document.getElementById('timerValue');
+        const btnConfirm = document.getElementById('btnConfirm');
+        const btnCancel = document.getElementById('btnCancel');
+        const btnCheckin = document.getElementById('btnCheckin');
+        const formArea = document.getElementById('formArea');
+
+        box.classList.remove('available', 'reserved', 'busy', 'none');
+        btnCheckin.classList.add('hidden');   // mặc định ẩn nút check-in
+
+        if (!selectedPod) {
+            clearInterval(reserveTimer);
+            box.classList.add('none'); txtStatus.innerText = "—";
+            podTitle.innerText = "Chưa chọn kén";
+            podZone.innerText = "Vui lòng chọn một kén còn trống";
+            lblSelection.innerText = ""; timerValue.innerText = "";
+            btnConfirm.disabled = true; btnConfirm.classList.remove('hidden'); btnCancel.classList.add('hidden');
+            formArea.classList.remove('hidden');
+            return;
+        }
+
+        const p = currentPods[selectedPod] || { status: "available" };
+        const st = p.status || "available";
+        const isHardware = selectedPod === KEN_HARDWARE_POD;
+        podTitle.innerText = "Kén " + selectedPod;
+        podZone.innerText = kenZoneLabel(selectedPod);
+
+        if (st === "available") {
+            clearInterval(reserveTimer);
+            box.classList.add('available'); txtStatus.innerText = "Đang Trống";
+            const heldPod = myActivePod();
+            if (heldPod && heldPod !== selectedPod) {
+                // Đang giữ/dùng 1 kén khác -> KHÔNG cho đặt thêm, phải huỷ kén kia trước
+                lblSelection.innerText = "⚠️ Không thể đặt — bạn đang giữ kén " + heldPod + ". Hãy huỷ kén đó trước.";
+                timerValue.innerText = "";
+                formArea.classList.add('hidden');
+                btnConfirm.disabled = true; btnConfirm.classList.remove('hidden'); btnCancel.classList.add('hidden');
+            } else {
+                lblSelection.innerText = "Sẵn sàng đặt · " + priceLabel(tempDuration);
+                timerValue.innerText = "";
+                formArea.classList.remove('hidden');
+                btnConfirm.disabled = false; btnConfirm.classList.remove('hidden'); btnCancel.classList.add('hidden');
+            }
+        } else if (st === "reserved") {
+            box.classList.add('reserved');
+            formArea.classList.add('hidden'); btnConfirm.classList.add('hidden');
+            const mine = isMyPod(p);
+            if (mine) {
+                txtStatus.innerText = "Bạn Đã Giữ Chỗ";
+                if (isHardware) {
+                    lblSelection.innerText = "Tới kén N1-01 và đặt điện thoại vào cảm biến (trong 30 giây)";
+                } else {
+                    lblSelection.innerText = "Bấm Check-in để vào kén và bắt đầu đếm ngược (giữ chỗ 30 giây)";
+                    btnCheckin.classList.remove('hidden');   // kén giả lập: tự check-in trên web
+                }
+                btnCancel.classList.remove('hidden');
+                startHoldCountdown(p.reserveAt);
+            } else {
+                txtStatus.innerText = "Đã Có Người Đặt";
+                lblSelection.innerText = canSeeIdentity
+                    ? ((p.user || "") + " (MSSV " + (p.mssv || "") + ") đã đặt")
+                    : (KenAuth.maskStudent(p.mssv) + " đã đặt");
+                timerValue.innerText = "";
+                btnCancel.classList.add('hidden');
+            }
+        } else { // busy
+            box.classList.add('busy'); txtStatus.innerText = "Kén Đang Dùng";
+            const ownBusy = isMyPod(p);
+            lblSelection.innerText = "Người dùng: " + ((ownBusy || canSeeIdentity) ? ((p.user || "") + " · " + (p.mssv || "")) : KenAuth.maskStudent(p.mssv));
+            formArea.classList.add('hidden'); btnConfirm.classList.add('hidden'); btnCancel.classList.add('hidden');
+            if (isHardware || typeof p.countdown === "number") {
+                // N1-01: ESP gửi countdown. Chạy đồng hồ cục bộ cho MƯỢT, đồng bộ lại
+                // mỗi khi ESP đẩy giá trị mới (giống hệt cách ver 1 chạy êm, chống đơ/giật).
+                if (typeof p.countdown === "number" && p.countdown > 0) {
+                    chayDongHoCucBo(p.countdown);
+                } else {
+                    clearInterval(reserveTimer);
+                    timerValue.innerText = isHardware ? "Đang khóa cửa..." : "";
+                }
+            } else if (p.endAt) {
+                // Kén giả lập: tự đếm ngược theo endAt, hết giờ -> tự check-out (nếu là chủ)
+                startBusyCountdown(p.endAt, ownBusy, selectedPod);
+            }
+        }
+    }
+
+    function mmss(ms) { if (ms < 0) ms = 0; const s = Math.floor(ms/1000); return String(Math.floor(s/60)).padStart(2,'0') + ":" + String(s%60).padStart(2,'0'); }
+
+    // Đồng hồ đếm ngược cục bộ cho kén phần cứng N1-01: chạy mượt từng giây phía web,
+    // tự đồng bộ lại theo giá trị thực ESP đẩy lên Firebase (chống đơ/giật do mạng nghẽn).
+    function chayDongHoCucBo(soGiay) {
+        clearInterval(reserveTimer);
+        let timeLeft = soGiay;
+        const timerValue = document.getElementById('timerValue');
+        timerValue.innerText = "Còn lại: " + mmss(timeLeft * 1000);
+        reserveTimer = setInterval(() => {
+            timeLeft--;
+            const p = currentPods[selectedPod];
+            if (timeLeft >= 0 && p && p.status === "busy") {
+                timerValue.innerText = "Còn lại: " + mmss(timeLeft * 1000);
+            } else {
+                clearInterval(reserveTimer);
+            }
+        }, 1000);
+    }
+
+    function startHoldCountdown(reserveAt) {
+        clearInterval(reserveTimer);
+        const timerValue = document.getElementById('timerValue');
+        function tick() {
+            const left = (reserveAt + KEN_RESERVE_HOLD_MS) - Date.now();
+            if (left > 0) {
+                timerValue.innerText = "Thời gian giữ chỗ còn: " + mmss(left);
+            } else {
+                clearInterval(reserveTimer);
+                // Hết giờ giữ chỗ -> tự huỷ nếu mình là chủ
+                const p = currentPods[selectedPod];
+                if (p && isMyPod(p) && p.status === "reserved") huyLenhLapTuc();
+            }
+        }
+        tick();
+        reserveTimer = setInterval(tick, 1000);
+    }
+
+    // Dọn các lệnh giữ chỗ QUÁ HẠN (người đặt rời trang, không bấm Huỷ) -> trả kén về trống.
+    // Chạy trên mọi client đang mở nên kén không bị kẹt "Đã đặt" mãi. N1-01 do ESP tự lo,
+    // các kén giả lập (N1-02..N2-05) được dọn ở đây. Việc ghi "available" là idempotent nên an toàn.
+    function sweepExpiredReservations() {
+        const now = Date.now();
+        KEN_PODS.forEach(id => {
+            if (id === KEN_HARDWARE_POD) return; // N1-01 để ESP tự giải phóng (phần cứng)
+            const p = currentPods[id];
+            if (p && p.status === "reserved" && p.reserveAt && (p.reserveAt + KEN_RESERVE_HOLD_MS) < now) {
+                database.ref('pods/' + id).set({ zone: kenZoneOf(id), status: "available" });
+            }
+        });
+    }
+    setInterval(sweepExpiredReservations, 5000);
+
+    // ===== Lắng nghe toàn bộ kén =====
+    database.ref('pods').on('value', snap => {
+        currentPods = snap.val() || {};
+        sweepExpiredReservations();
+        // Chọn sẵn kén từ URL nếu hợp lệ & đang trống (chỉ lần đầu)
+        if (!selectedPod && urlPod && KEN_PODS.includes(urlPod)) {
+            selectedPod = urlPod;
+            currentFloor = kenZoneOf(urlPod);
+            document.getElementById('ftN1').classList.toggle('active', currentFloor === "N1");
+            document.getElementById('ftN2').classList.toggle('active', currentFloor === "N2");
+        }
+        renderPicker();
+        renderSelectedPod();
+    });
+
+    // ===== Xác nhận đặt (giữ chỗ 1 phút) =====
+    function xacNhanDat() {
+        if (!selectedPod) { alert("Vui lòng chọn một kén!"); return; }
+        // Mỗi người chỉ được 1 kén: nếu đang giữ/dùng kén khác thì chặn lại
+        const heldPod = myActivePod();
+        if (heldPod && heldPod !== selectedPod) {
+            alert("Bạn đang giữ kén " + heldPod + ". Vui lòng huỷ kén đó trước khi đặt kén khác!");
+            return;
+        }
+        const p = currentPods[selectedPod] || {};
+        if (p.status && p.status !== "available") { alert("Kén này vừa có người đặt, vui lòng chọn kén khác!"); return; }
+
+        // Họ tên & MSSV lấy thẳng từ tài khoản đang đăng nhập
+        const name = myName;
+        const mssv = myMssv;
+        if (!name || !mssv) { alert("Tài khoản thiếu thông tin cá nhân, vui lòng liên hệ Admin!"); return; }
+
+        const now = Date.now();
+        database.ref('pods/' + selectedPod).set({
+            zone: kenZoneOf(selectedPod), status: "reserved",
+            user: name, mssv: mssv, duration: tempDuration,
+            reserveAt: now, booking_owner: deviceId
+        });
+
+        // Ghi nhật ký hoạt động (trạng thái giữ chỗ)
+        const ref = database.ref('activity_log').push();
+        activityKey = ref.key;
+        ref.set({
+            pod: selectedPod, zone: kenZoneOf(selectedPod), user: name, mssv: mssv,
+            durationMin: tempDuration, price: kenPriceOf(tempDuration),
+            bookAt: now, status: "reserved"
+        });
+    }
+
+    // ===== Huỷ giữ chỗ =====
+    function huyLenhLapTuc() {
+        clearInterval(reserveTimer);
+        if (selectedPod) {
+            database.ref('pods/' + selectedPod).set({ zone: kenZoneOf(selectedPod), status: "available" });
+        }
+        if (activityKey) {
+            database.ref('activity_log/' + activityKey + '/status').set("cancelled");
+            activityKey = null;
+        }
+    }
+
+    // ===== Check-in trên web (kén giả lập): vào kén & bắt đầu đếm ngược =====
+    function checkInNow() {
+        const id = selectedPod; if (!id) return;
+        const p = currentPods[id]; if (!p || p.status !== "reserved") return;
+        if (!isMyPod(p)) return;
+        if (id === KEN_HARDWARE_POD) { alert("Kén N1-01 dùng cảm biến phần cứng, không check-in trên web."); return; }
+
+        clearInterval(reserveTimer);
+        const now = Date.now();
+        const dur = Number(p.duration) || tempDuration;
+        database.ref('pods/' + id).update({ status: "busy", checkinAt: now, endAt: now + dur * 1000 });
+        database.ref('activity_log/in_' + id + '_' + now).set({
+            pod: id, zone: kenZoneOf(id), user: p.user || myName, mssv: p.mssv || myMssv,
+            durationMin: dur, price: kenPriceOf(dur), bookAt: now, checkinAt: now, status: "busy"
+        });
+        activityKey = null; // phiên giữ chỗ đã chuyển sang đang dùng
+    }
+
+    // ===== Check-out (tự động khi hết giờ) — khoá xác định nên không trùng =====
+    function checkoutNow(id) {
+        const p = currentPods[id]; if (!p || p.status !== "busy") return;
+        clearInterval(reserveTimer);
+        const now = Date.now();
+        database.ref('pods/' + id).set({ zone: kenZoneOf(id), status: "available" });
+        if (p.checkinAt) database.ref('usage_log/' + id + '_' + p.checkinAt + '/checkoutAt').set(now);
+        database.ref('activity_log/done_' + id + '_' + (p.checkinAt || now)).set({
+            pod: id, zone: kenZoneOf(id), user: p.user || "", mssv: p.mssv || "",
+            durationMin: Number(p.duration) || 0, price: kenPriceOf(Number(p.duration) || 0),
+            bookAt: p.checkinAt || now, checkinAt: p.checkinAt || null, checkoutAt: now, status: "completed"
+        });
+    }
+
+    // ===== Đếm ngược lúc đang dùng (kén giả lập) =====
+    function startBusyCountdown(endAt, mine, podId) {
+        clearInterval(reserveTimer);
+        const timerValue = document.getElementById('timerValue');
+        function tick() {
+            const left = endAt - Date.now();
+            if (left > 0) {
+                timerValue.innerText = "Còn lại: " + mmss(left);
+            } else {
+                timerValue.innerText = "Còn lại: 00:00";
+                clearInterval(reserveTimer);
+                if (mine) checkoutNow(podId);
+            }
+        }
+        tick();
+        reserveTimer = setInterval(tick, 1000);
+    }
+
+    // ===== Sinh viên tự đổi mật khẩu =====
+    async function changeMyPassword() {
+        const acc = (sessionStorage.getItem("user_name") || "");
+        if (!acc) return;
+        const oldPass = prompt("Nhập mật khẩu HIỆN TẠI:");
+        if (oldPass === null) return;
+        try {
+            const snap = await database.ref('accounts/' + acc + '/passwordHash').once('value');
+            const curHash = snap.val();
+            const oldHash = await KenAuth.hashPassword(oldPass.trim());
+            if (!curHash || oldHash !== curHash) { alert("Mật khẩu hiện tại không đúng!"); return; }
+
+            const np = prompt("Nhập mật khẩu MỚI (chỉ chữ Latin + số):");
+            if (np === null) return;
+            const pass = np.trim();
+            if (!KenAuth.isValidCredential(pass)) { alert("Mật khẩu mới không hợp lệ! Chỉ gồm chữ Latin + số, tối đa 30 ký tự."); return; }
+            const cf = prompt("Nhập lại mật khẩu MỚI để xác nhận:");
+            if (cf === null) return;
+            if (cf.trim() !== pass) { alert("Hai lần nhập không khớp!"); return; }
+
+            const newHash = await KenAuth.hashPassword(pass);
+            await database.ref('accounts/' + acc + '/passwordHash').set(newHash);
+            alert("Đổi mật khẩu thành công!");
+        } catch (e) { alert("Lỗi: " + e.message); }
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Tài Khoản - Kén Ngủ V2</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="auth.js?v=8"></script>
+    <script src="notify.js?v=8"></script>
+    <style>
+        :root {
+            --bg-main: #f4f5f9;
+            --bg-card: #ffffff;
+            --text-main: #1d1d1f;
+            --text-sub: #86868b;
+            --green: #34c759;
+            --yellow: #ffcc00;
+            --red: #ff3b30;
+            --blue: #007aff;
+            --radius: 16px;
+        }
+        * { box-sizing: border-box; }
+        /* Không cho bôi đen / hiện con trỏ chữ trên text (chỉ ô nhập mới được) */
+        body { -webkit-user-select: none; -moz-user-select: none; user-select: none; cursor: default; }
+        input, textarea { -webkit-user-select: text; -moz-user-select: text; user-select: text; cursor: text; }
+        /* Cho phép bôi đen & copy thông tin tài khoản trong bảng */
+        #accountTableBody td { -webkit-user-select: text; -moz-user-select: text; user-select: text; cursor: text; }
+        #accountTableBody td .name { -webkit-user-select: text; user-select: text; }
+        #accountTableBody td .btn { cursor: pointer; }     /* nút vẫn là con trỏ bấm */
+        .copy-ic { cursor: pointer; color: var(--text-sub); font-size: 14px; margin-left: 6px; user-select: none; }
+        .copy-ic:hover { color: var(--blue); }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 24px;
+        }
+        .container { max-width: 1100px; margin: 0 auto; }
+
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--bg-card); padding: 16px 24px; border-radius: var(--radius);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.02); margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+        }
+        .header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+        .header p { margin: 4px 0 0 0; font-size: 13px; color: var(--text-sub); }
+        .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        .btn {
+            border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px;
+            font-weight: 600; cursor: pointer; transition: 0.15s; display: inline-flex;
+            align-items: center; gap: 6px;
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn-blue { background: var(--blue); color: #fff; }
+        .btn-light { background: #e5e5ea; color: #1c1c1e; }
+        .btn-red { background: var(--red); color: #fff; }
+        .btn-green { background: var(--green); color: #fff; }
+        .btn-sm { padding: 7px 12px; font-size: 13px; border-radius: 8px; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .card {
+            background: var(--bg-card); padding: 24px; border-radius: var(--radius);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.02); margin-bottom: 20px;
+        }
+        .card-title {
+            font-size: 13px; font-weight: 600; color: var(--text-sub);
+            text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 18px;
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        /* Form thêm tài khoản */
+        .add-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; align-items: end; }
+        .field label { font-size: 12px; font-weight: 600; color: var(--text-sub); display: block; margin-bottom: 6px; }
+        .field input {
+            width: 100%; padding: 11px; border: 1px solid #c7c7cc; border-radius: 10px;
+            font-size: 15px; outline: none; background: #fafafa;
+        }
+        .field input:focus { border-color: var(--blue); background: #fff; }
+        .checkbox-field { display: flex; align-items: center; gap: 8px; padding-bottom: 11px; }
+        .checkbox-field input { width: 18px; height: 18px; }
+        .checkbox-field label { font-size: 14px; font-weight: 500; color: var(--text-main); margin: 0; }
+        .form-msg { font-size: 13px; margin-top: 12px; min-height: 18px; font-weight: 500; }
+
+        /* Bảng tài khoản */
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 14px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+        th { font-size: 12px; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.04em; }
+        td .name { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+
+        .badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; display: inline-block; }
+        .badge-admin { background: rgba(0,122,255,0.12); color: var(--blue); }
+        .badge-user { background: rgba(134,134,139,0.15); color: var(--text-sub); }
+        .badge-on { background: rgba(52,199,89,0.15); color: #1d9e54; }
+        .badge-off { background: rgba(255,59,48,0.12); color: var(--red); }
+        .badge-lock { background: rgba(255,204,0,0.18); color: #9a7d00; }
+
+        .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .empty { text-align: center; color: var(--text-sub); padding: 30px; font-size: 14px; }
+
+        @media (max-width: 720px) {
+            .add-form { grid-template-columns: 1fr; }
+            table, thead, tbody, th, td, tr { display: block; }
+            thead { display: none; }
+            tr { border: 1px solid #eee; border-radius: 12px; margin-bottom: 12px; padding: 8px; }
+            td { border: none; padding: 8px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <div>
+            <h1><i class="ti ti-users-group"></i> Quản Lý Tài Khoản</h1>
+            <p>Đang đăng nhập: <b id="lblCurrentUser">Admin</b> · Hệ Thống Kén Ngủ V2</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-light" onclick="KenAuth.goHome()"><i class="ti ti-home"></i> Trang chủ</button>
+            <button class="btn btn-light" onclick="location.href='dashboard.html'"><i class="ti ti-dashboard"></i> Dashboard</button>
+            <button class="btn btn-light" onclick="location.href='booking.html'"><i class="ti ti-bed"></i> Đặt Kén</button>
+            <button class="btn btn-light" onclick="doChangeAdminPassword()"><i class="ti ti-key"></i> Đổi MK Admin</button>
+            <button class="btn btn-light" onclick="doResetAdminPassword()"><i class="ti ti-refresh"></i> Reset MK Admin</button>
+            <button class="btn btn-red" onclick="KenAuth.logout()"><i class="ti ti-logout"></i> Đăng Xuất</button>
+        </div>
+    </div>
+
+    <!-- Thêm tài khoản -->
+    <div class="card">
+        <div class="card-title"><i class="ti ti-user-plus"></i> Thêm Tài Khoản Mới</div>
+        <div class="add-form">
+            <div class="field">
+                <label>MSSV (11 số · dùng để đăng nhập)</label>
+                <input type="text" id="newMSSV" placeholder="vd: 22000012345" inputmode="numeric" autocomplete="off">
+            </div>
+            <div class="field">
+                <label>HỌ VÀ TÊN SINH VIÊN</label>
+                <input type="text" id="newName" placeholder="vd: Nguyễn Văn A" autocomplete="off">
+            </div>
+            <div class="field">
+                <label>SỐ ĐIỆN THOẠI</label>
+                <input type="text" id="newPhone" placeholder="vd: 0901234567" inputmode="numeric" autocomplete="off">
+            </div>
+            <div class="field">
+                <label>MẬT KHẨU (để trống = 123456)</label>
+                <input type="text" id="newPass" placeholder="123456" autocomplete="off">
+            </div>
+            <div class="checkbox-field">
+                <input type="checkbox" id="newDashboard">
+                <label for="newDashboard">Cấp quyền Dashboard</label>
+            </div>
+            <button class="btn btn-blue" id="btnAdd" onclick="doAddAccount()"><i class="ti ti-plus"></i> Thêm</button>
+        </div>
+        <div class="form-msg" id="addMsg"></div>
+    </div>
+
+    <!-- Danh sách tài khoản -->
+    <div class="card">
+        <div class="card-title"><i class="ti ti-list"></i> Danh Sách Tài Khoản</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>MSSV / Tài khoản</th>
+                    <th>Họ tên</th>
+                    <th>SĐT</th>
+                    <th>Vai trò</th>
+                    <th>Dashboard</th>
+                    <th>Hành động</th>
+                </tr>
+            </thead>
+            <tbody id="accountTableBody">
+                <tr><td colspan="6" class="empty">Đang tải danh sách...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // ===== Cổng bảo mật: chỉ Admin =====
+    if (!KenAuth.requireAdmin()) {
+        throw new Error("Chặn truy cập: không phải Admin");
+    }
+
+    firebase.initializeApp(KEN_FIREBASE_CONFIG);
+    const database = firebase.database();
+    KenNotify.init(database); // thông báo pop-up (chỉ Admin)
+    const accountsRef = database.ref('accounts');
+
+    document.getElementById('lblCurrentUser').innerText = sessionStorage.getItem("user_name") || "Admin";
+
+    const addMsg = document.getElementById('addMsg');
+    let addMsgTimer = null;
+    function showAddMsg(text, ok) {
+        addMsg.style.color = ok ? "#1d9e54" : "#ff3b30";
+        addMsg.innerText = text;
+        clearTimeout(addMsgTimer);
+        if (text) addMsgTimer = setTimeout(() => { addMsg.innerText = ""; }, 3000); // tự ẩn sau 3s
+    }
+
+    // ===== Render danh sách realtime =====
+    accountsRef.on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        const tbody = document.getElementById('accountTableBody');
+        const usernames = Object.keys(data).sort((a, b) => {
+            // Admin lên đầu, còn lại theo bảng chữ cái
+            if (a === "Admin") return -1;
+            if (b === "Admin") return 1;
+            return a.localeCompare(b);
+        });
+
+        if (usernames.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty">Chưa có tài khoản nào.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = "";
+        usernames.forEach(u => {
+            const acc = data[u];
+            const isAdmin = acc.role === "admin";
+            const isLocked = acc.locked === true;
+            const hasDash = isAdmin || acc.dashboard === true;
+
+            const roleBadge = isAdmin
+                ? '<span class="badge badge-admin">ADMIN</span>'
+                : '<span class="badge badge-user">USER</span>';
+
+            const dashBadge = hasDash
+                ? '<span class="badge badge-on">CÓ</span>'
+                : '<span class="badge badge-off">KHÔNG</span>';
+
+            // Admin: không cho đổi quyền dashboard (luôn có), không cho xóa
+            let actions = "";
+            if (isLocked) {
+                actions = '<span class="badge badge-lock"><i class="ti ti-lock"></i> Tài khoản hệ thống</span>';
+            } else {
+                const toggleLabel = acc.dashboard === true ? "Thu hồi Dashboard" : "Cấp Dashboard";
+                const toggleClass = acc.dashboard === true ? "btn-light" : "btn-green";
+                actions =
+                    `<div class="row-actions">
+                        <button class="btn ${toggleClass} btn-sm" onclick="toggleDashboard('${u}', ${acc.dashboard === true})">
+                            <i class="ti ti-shield"></i> ${toggleLabel}
+                        </button>
+                        <button class="btn btn-light btn-sm" onclick="resetPassword('${u}')">
+                            <i class="ti ti-refresh"></i> Reset MK
+                        </button>
+                        <button class="btn btn-red btn-sm" onclick="deleteAccount('${u}')">
+                            <i class="ti ti-trash"></i> Xóa
+                        </button>
+                    </div>`;
+            }
+
+            const hoTen = isAdmin ? "—" : (acc.hoTen || "—");
+            const sdt = isAdmin ? "—" : (acc.sdt || "—");
+
+            const copyMssv = `<i class="ti ti-copy copy-ic" title="Copy MSSV" onclick="copyText('${u}')"></i>`;
+            const copySdt = (!isAdmin && acc.sdt) ? ` <i class="ti ti-copy copy-ic" title="Copy SĐT" onclick="copyText('${acc.sdt}')"></i>` : "";
+
+            const tr = document.createElement('tr');
+            tr.innerHTML =
+                `<td><div class="name"><i class="ti ti-user"></i> ${u} ${copyMssv}</div></td>
+                 <td>${hoTen}</td>
+                 <td>${sdt}${copySdt}</td>
+                 <td>${roleBadge}</td>
+                 <td>${dashBadge}</td>
+                 <td>${actions}</td>`;
+            tbody.appendChild(tr);
+        });
+    });
+
+    // ===== Thêm tài khoản (đăng nhập bằng MSSV) =====
+    async function doAddAccount() {
+        showAddMsg("", true);
+        const mssv = document.getElementById('newMSSV').value.trim();
+        const hoTen = document.getElementById('newName').value.trim();
+        const sdt = document.getElementById('newPhone').value.trim();
+        let pass = document.getElementById('newPass').value.trim();
+        const grantDash = document.getElementById('newDashboard').checked;
+
+        if (!KenAuth.isValidMSSV(mssv)) { showAddMsg("MSSV phải là dãy gồm đúng 11 chữ số!", false); return; }
+        if (mssv.toLowerCase() === "admin") { showAddMsg("MSSV không hợp lệ!", false); return; }
+        if (!KenAuth.isValidName(hoTen)) { showAddMsg("Họ tên không hợp lệ (chỉ gồm chữ và khoảng trắng)!", false); return; }
+        if (!KenAuth.isValidPhone(sdt)) { showAddMsg("Số điện thoại phải là 10–11 chữ số!", false); return; }
+
+        if (pass === "") pass = KenAuth.NEW_USER_DEFAULT_PASSWORD; // mặc định 123456
+        if (!KenAuth.isValidCredential(pass)) {
+            showAddMsg("Mật khẩu chỉ gồm chữ Latin + số (không ký tự đặc biệt), tối đa 30 ký tự.", false);
+            return;
+        }
+
+        const btn = document.getElementById('btnAdd');
+        btn.disabled = true;
+
+        try {
+            const existed = await database.ref('accounts/' + mssv).once('value');
+            if (existed.exists()) {
+                showAddMsg("Tài khoản MSSV '" + mssv + "' đã tồn tại!", false);
+                return;
+            }
+
+            const hash = await KenAuth.hashPassword(pass);
+            await database.ref('accounts/' + mssv).set({
+                passwordHash: hash,
+                role: "user",
+                hoTen: hoTen,
+                sdt: sdt,
+                dashboard: grantDash,            // booking là mặc định cho mọi user; dashboard tùy cấp
+                locked: false,
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            });
+
+            document.getElementById('newMSSV').value = "";
+            document.getElementById('newName').value = "";
+            document.getElementById('newPhone').value = "";
+            document.getElementById('newPass').value = "";
+            document.getElementById('newDashboard').checked = false;
+            showAddMsg("Đã thêm tài khoản '" + hoTen + "' (MSSV " + mssv + ") thành công!", true);
+        } catch (e) {
+            showAddMsg("Lỗi khi thêm tài khoản: " + e.message, false);
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    // ===== Copy nhanh thông tin (MSSV / SĐT) =====
+    function copyText(t) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(t).then(() => showAddMsg("Đã copy: " + t, true)).catch(() => fallbackCopy(t));
+        } else { fallbackCopy(t); }
+    }
+    function fallbackCopy(t) {
+        const ta = document.createElement('textarea');
+        ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); showAddMsg("Đã copy: " + t, true); } catch (e) { showAddMsg("Không copy được, hãy bôi đen thủ công.", false); }
+        document.body.removeChild(ta);
+    }
+
+    // ===== Bật/tắt quyền Dashboard =====
+    function toggleDashboard(username, currentlyOn) {
+        database.ref('accounts/' + username + '/dashboard').set(!currentlyOn)
+            .catch(e => alert("Lỗi: " + e.message));
+    }
+
+    // ===== Reset mật khẩu về mặc định 123456 =====
+    async function resetPassword(username) {
+        if (!confirm("Đặt lại mật khẩu của '" + username + "' về mặc định (123456)?")) return;
+        try {
+            const hash = await KenAuth.hashPassword(KenAuth.NEW_USER_DEFAULT_PASSWORD);
+            await database.ref('accounts/' + username + '/passwordHash').set(hash);
+            alert("Đã reset mật khẩu của '" + username + "' về 123456.");
+        } catch (e) { alert("Lỗi: " + e.message); }
+    }
+
+    // ===== Xóa tài khoản =====
+    async function deleteAccount(username) {
+        if (username === "Admin") { alert("Không thể xóa tài khoản hệ thống Admin!"); return; }
+        if (!confirm("Bạn chắc chắn muốn XÓA tài khoản '" + username + "'? Hành động không thể hoàn tác.")) return;
+        try {
+            await database.ref('accounts/' + username).remove();
+        } catch (e) { alert("Lỗi: " + e.message); }
+    }
+
+    // ===== Đổi mật khẩu Admin (tài khoản đang đăng nhập) =====
+    // Admin được phép dùng mọi ký tự (mật khẩu mặc định A@a123 có ký tự đặc biệt).
+    async function doChangeAdminPassword() {
+        const np = prompt("Nhập mật khẩu MỚI cho tài khoản Admin:");
+        if (np === null) return;
+        const pass = np.trim();
+        if (pass.length < 4) { alert("Mật khẩu Admin tối thiểu 4 ký tự!"); return; }
+        const confirmPass = prompt("Nhập lại mật khẩu MỚI để xác nhận:");
+        if (confirmPass === null) return;
+        if (confirmPass.trim() !== pass) { alert("Hai lần nhập không khớp!"); return; }
+        try {
+            const hash = await KenAuth.hashPassword(pass);
+            await database.ref('accounts/Admin/passwordHash').set(hash);
+            alert("Đã đổi mật khẩu Admin thành công!");
+        } catch (e) { alert("Lỗi: " + e.message); }
+    }
+
+    // ===== Reset mật khẩu Admin về mặc định A@a123 (dùng khi quên) =====
+    async function doResetAdminPassword() {
+        if (!confirm("Đặt lại mật khẩu Admin về mặc định (A@a123)?")) return;
+        try {
+            const hash = await KenAuth.hashPassword(KenAuth.ADMIN_DEFAULT_PASSWORD);
+            await database.ref('accounts/Admin/passwordHash').set(hash);
+            alert("Đã reset mật khẩu Admin về A@a123.");
+        } catch (e) { alert("Lỗi: " + e.message); }
+    }
+</script>
+</body>
+</html>
