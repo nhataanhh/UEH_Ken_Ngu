@@ -7,8 +7,10 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <script src="auth.js?v=8"></script>
-    <script src="notify.js?v=8"></script>
+    <script src="auth.js?v=10"></script>
+    <script src="pods.js?v=13"></script>
+    <script src="ken-core.js?v=5"></script>
+    <script src="notify.js?v=10"></script>
     <style>
         :root {
             --bg-main: #f4f5f9;
@@ -18,7 +20,7 @@
             --green: #34c759;
             --yellow: #ffcc00;
             --red: #ff3b30;
-            --blue: #007aff;
+            --blue: #0E7C8B;        /* teal UEH */
             --radius: 16px;
         }
         * { box-sizing: border-box; }
@@ -44,6 +46,7 @@
             display: flex; justify-content: space-between; align-items: center;
             background: var(--bg-card); padding: 16px 24px; border-radius: var(--radius);
             box-shadow: 0 4px 20px rgba(0,0,0,0.02); margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+            border-top: 4px solid var(--blue);
         }
         .header h1 { margin: 0; font-size: 20px; font-weight: 600; }
         .header p { margin: 4px 0 0 0; font-size: 13px; color: var(--text-sub); }
@@ -92,7 +95,7 @@
         td .name { font-weight: 600; display: flex; align-items: center; gap: 6px; }
 
         .badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; display: inline-block; }
-        .badge-admin { background: rgba(0,122,255,0.12); color: var(--blue); }
+        .badge-admin { background: rgba(14,124,139,0.12); color: var(--blue); }
         .badge-user { background: rgba(134,134,139,0.15); color: var(--text-sub); }
         .badge-on { background: rgba(52,199,89,0.15); color: #1d9e54; }
         .badge-off { background: rgba(255,59,48,0.12); color: var(--red); }
@@ -114,9 +117,12 @@
 
 <div class="container">
     <div class="header">
-        <div>
-            <h1><i class="ti ti-users-group"></i> Quản Lý Tài Khoản</h1>
-            <p>Đang đăng nhập: <b id="lblCurrentUser">Admin</b> · Hệ Thống Kén Ngủ V2</p>
+        <div style="display:flex;align-items:center;gap:14px">
+            <img src="Logo_UEH_xanh.png" alt="UEH University" style="height:46px">
+            <div style="border-left:2px solid #e5e7eb;padding-left:14px">
+                <h1><i class="ti ti-users-group"></i> Quản Lý Tài Khoản</h1>
+                <p>Đang đăng nhập: <b id="lblCurrentUser">Admin</b> · Hệ Thống Kén Ngủ V2</p>
+            </div>
         </div>
         <div class="header-actions">
             <button class="btn btn-light" onclick="KenAuth.goHome()"><i class="ti ti-home"></i> Trang chủ</button>
@@ -124,6 +130,8 @@
             <button class="btn btn-light" onclick="location.href='booking.html'"><i class="ti ti-bed"></i> Đặt Kén</button>
             <button class="btn btn-light" onclick="doChangeAdminPassword()"><i class="ti ti-key"></i> Đổi MK Admin</button>
             <button class="btn btn-light" onclick="doResetAdminPassword()"><i class="ti ti-refresh"></i> Reset MK Admin</button>
+            <button class="btn btn-green" id="btnTgToggle" onclick="toggleTelegram()"><i class="ti ti-brand-telegram"></i> Telegram</button>
+            <button class="btn btn-light" onclick="clearTestData()"><i class="ti ti-eraser"></i> Xoá dữ liệu test</button>
             <button class="btn btn-red" onclick="KenAuth.logout()"><i class="ti ti-logout"></i> Đăng Xuất</button>
         </div>
     </div>
@@ -148,6 +156,10 @@
                 <label>MẬT KHẨU (để trống = 123456)</label>
                 <input type="text" id="newPass" placeholder="123456" autocomplete="off">
             </div>
+            <div class="field">
+                <label>SỐ DƯ BAN ĐẦU (đ · đã thanh toán)</label>
+                <input type="text" id="newBalance" placeholder="vd: 10000" inputmode="numeric" autocomplete="off">
+            </div>
             <div class="checkbox-field">
                 <input type="checkbox" id="newDashboard">
                 <label for="newDashboard">Cấp quyền Dashboard</label>
@@ -166,13 +178,15 @@
                     <th>MSSV / Tài khoản</th>
                     <th>Họ tên</th>
                     <th>SĐT</th>
+                    <th>Số dư</th>
                     <th>Vai trò</th>
                     <th>Dashboard</th>
+                    <th>Trạng thái</th>
                     <th>Hành động</th>
                 </tr>
             </thead>
             <tbody id="accountTableBody">
-                <tr><td colspan="6" class="empty">Đang tải danh sách...</td></tr>
+                <tr><td colspan="8" class="empty">Đang tải danh sách...</td></tr>
             </tbody>
         </table>
     </div>
@@ -186,6 +200,7 @@
 
     firebase.initializeApp(KEN_FIREBASE_CONFIG);
     const database = firebase.database();
+    KenTele.init(database);   // theo dõi công tắc Telegram
     KenNotify.init(database); // thông báo pop-up (chỉ Admin)
     const accountsRef = database.ref('accounts');
 
@@ -212,7 +227,7 @@
         });
 
         if (usernames.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="empty">Chưa có tài khoản nào.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="empty">Chưa có tài khoản nào.</td></tr>';
             return;
         }
 
@@ -222,6 +237,14 @@
             const isAdmin = acc.role === "admin";
             const isLocked = acc.locked === true;
             const hasDash = isAdmin || acc.dashboard === true;
+
+            const bal = Number(acc.balance) || 0;
+            const balText = isAdmin ? "—" : ("<b>" + bal.toLocaleString('vi-VN') + "đ</b>");
+            const banSt = KenBan.blockState(acc);
+            const statusBadge = banSt
+                ? (banSt.perm ? '<span class="badge badge-off"><i class="ti ti-ban"></i> KHOÁ (spam)</span>'
+                              : '<span class="badge badge-lock"><i class="ti ti-clock"></i> TẠM KHOÁ</span>')
+                : '<span class="badge badge-on">Bình thường</span>';
 
             const roleBadge = isAdmin
                 ? '<span class="badge badge-admin">ADMIN</span>'
@@ -240,6 +263,10 @@
                 const toggleClass = acc.dashboard === true ? "btn-light" : "btn-green";
                 actions =
                     `<div class="row-actions">
+                        <button class="btn btn-green btn-sm" onclick="topUp('${u}')">
+                            <i class="ti ti-cash"></i> Nạp tiền
+                        </button>
+                        ${banSt ? `<button class="btn btn-blue btn-sm" onclick="unbanUser('${u}')"><i class="ti ti-lock-open"></i> Gỡ khoá</button>` : ''}
                         <button class="btn ${toggleClass} btn-sm" onclick="toggleDashboard('${u}', ${acc.dashboard === true})">
                             <i class="ti ti-shield"></i> ${toggleLabel}
                         </button>
@@ -263,8 +290,10 @@
                 `<td><div class="name"><i class="ti ti-user"></i> ${u} ${copyMssv}</div></td>
                  <td>${hoTen}</td>
                  <td>${sdt}${copySdt}</td>
+                 <td>${balText}</td>
                  <td>${roleBadge}</td>
                  <td>${dashBadge}</td>
+                 <td>${statusBadge}</td>
                  <td>${actions}</td>`;
             tbody.appendChild(tr);
         });
@@ -300,6 +329,8 @@
                 return;
             }
 
+            const initBalance = Math.max(0, parseInt((document.getElementById('newBalance').value || "0").replace(/\D/g, ""), 10) || 0);
+
             const hash = await KenAuth.hashPassword(pass);
             await database.ref('accounts/' + mssv).set({
                 passwordHash: hash,
@@ -308,6 +339,7 @@
                 sdt: sdt,
                 dashboard: grantDash,            // booking là mặc định cho mọi user; dashboard tùy cấp
                 locked: false,
+                balance: initBalance,            // số dư trả trước (đ)
                 createdAt: firebase.database.ServerValue.TIMESTAMP
             });
 
@@ -315,6 +347,7 @@
             document.getElementById('newName').value = "";
             document.getElementById('newPhone').value = "";
             document.getElementById('newPass').value = "";
+            document.getElementById('newBalance').value = "";
             document.getElementById('newDashboard').checked = false;
             showAddMsg("Đã thêm tài khoản '" + hoTen + "' (MSSV " + mssv + ") thành công!", true);
         } catch (e) {
@@ -322,6 +355,75 @@
         } finally {
             btn.disabled = false;
         }
+    }
+
+    // ===== Nạp tiền vào ví tài khoản (cộng dồn, dùng transaction) =====
+    function topUp(mssv) {
+        const raw = prompt("Nạp thêm bao nhiêu cho tài khoản " + mssv + "? (đ)");
+        if (raw === null) return;
+        const amount = Math.max(0, parseInt(String(raw).replace(/\D/g, ""), 10) || 0);
+        if (amount <= 0) { showAddMsg("Số tiền nạp không hợp lệ!", false); return; }
+        const by = sessionStorage.getItem("user_name") || "Admin";
+        database.ref('accounts/' + mssv + '/balance').transaction(
+            b => (b || 0) + amount,
+            (err, committed, snap) => {
+                if (err || !committed) { showAddMsg("Lỗi nạp tiền, thử lại!", false); return; }
+                const newBal = Number(snap.val()) || 0;
+                // Ghi nhật ký nạp tiền (để đối soát) + báo Telegram
+                database.ref('topup_log').push().set({
+                    mssv: mssv, amount: amount, by: by, at: firebase.database.ServerValue.TIMESTAMP
+                });
+                KenWallet.notifyTopup(mssv, amount, newBal, by);
+                showAddMsg("Đã nạp " + amount.toLocaleString('vi-VN') + "đ cho " + mssv +
+                           " (số dư: " + newBal.toLocaleString('vi-VN') + "đ).", true);
+            }
+        );
+    }
+
+    // ===== Admin gỡ khoá tài khoản bị ban spam =====
+    function unbanUser(mssv) {
+        if (!confirm("Gỡ khoá tài khoản " + mssv + "? (xoá cảnh báo spam)")) return;
+        KenBan.adminUnban(database, mssv);
+        showAddMsg("Đã gỡ khoá tài khoản " + mssv + ".", true);
+    }
+
+    // ===== Công tắc Telegram (đồng bộ mọi máy qua config/telegramEnabled) =====
+    let tgEnabled = true;
+    database.ref('config/telegramEnabled').on('value', s => {
+        tgEnabled = (s.val() === null ? true : s.val() !== false);
+        const b = document.getElementById('btnTgToggle');
+        if (b) {
+            b.innerHTML = '<i class="ti ti-brand-telegram"></i> Telegram: ' + (tgEnabled ? 'BẬT' : 'TẮT');
+            b.classList.toggle('btn-green', tgEnabled);
+            b.classList.toggle('btn-red', !tgEnabled);
+            b.classList.toggle('btn-light', false);
+        }
+    });
+    function toggleTelegram() { KenTele.setEnabled(database, !tgEnabled); }
+
+    // ===== Xoá dữ liệu test (GIỮ tài khoản + số dư ví) =====
+    async function clearTestData() {
+        if (!confirm("XOÁ TOÀN BỘ DỮ LIỆU TEST?\n\n• Xoá: nhật ký, lượt dùng, doanh thu, cảnh báo spam\n• Reset mọi kén về TRỐNG + gỡ mọi khoá spam\n• GIỮ NGUYÊN: tài khoản & số dư ví")) return;
+        if (!confirm("Chắc chắn? Hành động này KHÔNG hoàn tác được.")) return;
+        try {
+            const updates = {
+                activity_log: null, usage_log: null, strikes: null,
+                tg_sent: null, charged: null, topup_log: null
+            };
+            // Reset mọi kén về trống
+            KEN_PODS.forEach(id => { updates['pods/' + id] = { zone: kenZoneOf(id), status: "available" }; });
+            // Gỡ mọi cờ khoá spam trên tài khoản (giữ số dư + thông tin)
+            const snap = await database.ref('accounts').once('value');
+            const accs = snap.val() || {};
+            Object.keys(accs).forEach(u => {
+                updates['accounts/' + u + '/banned'] = null;
+                updates['accounts/' + u + '/bannedUntil'] = null;
+                updates['accounts/' + u + '/banStage'] = null;
+                updates['accounts/' + u + '/banReason'] = null;
+            });
+            await database.ref().update(updates);
+            showAddMsg("Đã xoá dữ liệu test, reset kén & gỡ mọi khoá spam. Tài khoản + số dư được giữ nguyên.", true);
+        } catch (e) { showAddMsg("Lỗi xoá dữ liệu: " + e.message, false); }
     }
 
     // ===== Copy nhanh thông tin (MSSV / SĐT) =====

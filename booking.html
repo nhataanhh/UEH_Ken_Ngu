@@ -8,8 +8,9 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <script src="auth.js?v=9"></script>
-    <script src="pods.js?v=9"></script>
+    <script src="auth.js?v=10"></script>
+    <script src="pods.js?v=13"></script>
+    <script src="ken-core.js?v=5"></script>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -24,7 +25,7 @@
         .who { font-size: 13px; color: #8e8e93; font-weight: 600; }
         .top-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .mini-btn { border: none; background: #e5e5ea; color: #1c1c1e; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
-        .mini-btn.blue { background: #007aff; color: #fff; }
+        .mini-btn.blue { background: #0E7C8B; color: #fff; }
 
         .card { background: #fff; padding: 22px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 16px; }
         h2 { margin: 0 0 4px; font-size: 19px; color: #1c1c1e; }
@@ -33,7 +34,7 @@
         /* Pod picker */
         .floor-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
         .floor-tab { flex: 1; padding: 8px; font-size: 13px; font-weight: 600; border: 1px solid #e5e5ea; background: #fff; color: #8e8e93; border-radius: 10px; cursor: pointer; }
-        .floor-tab.active { background: #007aff; color: #fff; border-color: #007aff; }
+        .floor-tab.active { background: #0E7C8B; color: #fff; border-color: #0E7C8B; }
         .pick-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
         @media (max-width: 420px) { .pick-grid { grid-template-columns: repeat(3, 1fr); } }
         .pick {
@@ -50,8 +51,8 @@
         .pick.busy .cap, .pick.busy .pst { color: #c0392b; }
         .pick.reserved { background: #fff3df; border-color: #f7c777; cursor: not-allowed; }
         .pick.reserved .cap, .pick.reserved .pst { color: #9a6a00; }
-        .pick.sel { background: #e6f1fb; border-color: #007aff; box-shadow: 0 0 0 2px rgba(0,122,255,0.25); }
-        .pick.sel .cap, .pick.sel .pst { color: #0c447c; }
+        .pick.sel { background: #e2f1f3; border-color: #0E7C8B; box-shadow: 0 0 0 2px rgba(14,124,139,0.25); }
+        .pick.sel .cap, .pick.sel .pst { color: #0a626e; }
 
         /* Selected pod big capsule */
         .ken-box {
@@ -75,17 +76,17 @@
             width: 100%; padding: 12px; border: 1px solid #c7c7cc; border-radius: 10px; font-size: 16px;
             outline: none; background: #fafafa;
         }
-        .form-row input:focus { border-color: #007aff; background: #fff; }
+        .form-row input:focus { border-color: #0E7C8B; background: #fff; }
 
         .time-options { display: flex; gap: 8px; }
         .time-btn { flex: 1; padding: 12px; border: none; background: #e5e5ea; color: #1c1c1e; font-weight: 600; border-radius: 12px; cursor: pointer; transition: .2s; }
-        .time-btn.active { background: #007aff; color: #fff; }
+        .time-btn.active { background: #0E7C8B; color: #fff; }
 
         .action-btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 12px; transition: .2s; }
-        .btn-confirm { background: #007aff; color: #fff; }
+        .btn-confirm { background: #0E7C8B; color: #fff; }
         .btn-confirm:disabled { background: #c7c7cc; cursor: not-allowed; }
         .btn-cancel { background: #ff3b30; color: #fff; }
-        .booker-info { background: #f2f7ff; border: 1px solid #cfe0ff; color: #0c447c; border-radius: 12px; padding: 10px 12px; font-size: 13px; margin-bottom: 4px; line-height: 1.5; }
+        .booker-info { background: #eef6f7; border: 1px solid #bfe0e4; color: #0a626e; border-radius: 12px; padding: 10px 12px; font-size: 13px; margin-bottom: 4px; line-height: 1.5; }
         .booker-info b { font-weight: 700; }
         .hidden { display: none !important; }
     </style>
@@ -94,7 +95,10 @@
 
 <div class="container">
     <div class="topbar">
-        <span class="who" id="lblWho"></span>
+        <span style="display:flex;align-items:center;gap:10px">
+            <img src="Logo_UEH_xanh.png" alt="UEH" style="height:32px">
+            <span class="who" id="lblWho"></span>
+        </span>
         <span class="top-actions">
             <button id="btnGoHome" class="mini-btn hidden" onclick="KenAuth.goHome()">Trang chủ</button>
             <button id="btnGoDashboard" class="mini-btn blue hidden" onclick="location.href='dashboard.html'">Dashboard</button>
@@ -108,8 +112,7 @@
         <h2>Chọn kén trên sơ đồ</h2>
         <div class="sub">Bấm vào kén còn trống (xanh) để đặt</div>
         <div class="floor-tabs">
-            <button class="floor-tab active" id="ftN1" onclick="switchFloor('N1')">N1 · Thư viện</button>
-            <button class="floor-tab" id="ftN2" onclick="switchFloor('N2')">N2 · Phòng tự học</button>
+            <button class="floor-tab active">N2 · Phòng tự học · Tầng trệt</button>
         </div>
         <div class="pick-grid" id="pickGrid"></div>
     </div>
@@ -132,14 +135,14 @@
             <div class="form-row">
                 <label>THỜI LƯỢNG NGỦ</label>
                 <div class="time-options" id="timeOptions">
-                    <button class="time-btn active" onclick="selectDuration(15,this)">15 giây</button>
+                    <button class="time-btn active" onclick="selectDuration(20,this)">20 giây</button>
                     <button class="time-btn" onclick="selectDuration(30,this)">30 giây</button>
                     <button class="time-btn" onclick="selectDuration(45,this)">45 giây</button>
                 </div>
             </div>
             <div class="form-row">
                 <label>GIÁ DỊCH VỤ</label>
-                <input type="text" id="txtPrice" value="4.000 VNĐ / 15 giây" readonly>
+                <input type="text" id="txtPrice" value="6.000 VNĐ / 20 giây" readonly>
             </div>
         </div>
 
@@ -154,15 +157,16 @@
     if (!KenAuth.requireLogin()) { throw new Error("Chưa đăng nhập"); }
 
     // ===== Biến trạng thái khai báo NGAY ĐẦU (tránh lỗi TDZ nếu đoạn sau có sự cố) =====
-    let tempDuration = 15;
+    let tempDuration = 20;
     let selectedPod = null;          // kén đang chọn để đặt
-    let currentFloor = "N1";
+    let currentFloor = "N2";   // chỉ còn 1 khu N2
     let currentPods = {};
     let reserveTimer = null;
     let activityKey = null;          // khoá bản ghi activity_log của lần đặt hiện tại
 
     firebase.initializeApp(KEN_FIREBASE_CONFIG);
     const database = firebase.database();
+    KenTele.init(database);   // theo dõi công tắc Telegram
 
     // Top bar — chào mừng bằng HỌ TÊN
     const myMssv = sessionStorage.getItem("user_name") || "";
@@ -179,8 +183,29 @@
     } catch (e) { console.error("watchPermissions:", e); }
 
     // Người đặt mặc định = chính tài khoản đang đăng nhập (không cần nhập tay)
-    document.getElementById('bookerInfo').innerHTML =
-        "Người đặt: <b>" + myName + "</b><br>MSSV: <b>" + myMssv + "</b>";
+    // Theo dõi tài khoản realtime để hiện SỐ DƯ và bắt trạng thái bị KHOÁ (spam)
+    let myAccount = {};
+    let myBalance = 0;
+    let wasBlocked = false;
+    function renderBookerInfo() {
+        const blk = KenBan.blockState(myAccount);
+        document.getElementById('bookerInfo').innerHTML =
+            "Người đặt: <b>" + myName + "</b> · MSSV: <b>" + myMssv + "</b><br>" +
+            "Số dư ví: <b style='color:#0E7C8B'>" + myBalance.toLocaleString('vi-VN') + "đ</b>" +
+            (blk ? "<br><b style='color:#ff3b30'>⚠️ " + blk.msg + "</b>" : "");
+        // Khoá luôn nút đặt khi đang bị ban (đồng bộ với chặn trong xacNhanDat)
+        const btn = document.getElementById('btnConfirm');
+        if (btn && blk) btn.disabled = true;
+        // Vừa hết khoá tạm -> khôi phục lại nút theo trạng thái kén
+        if (wasBlocked && !blk) renderSelectedPod();
+        wasBlocked = !!blk;
+    }
+    database.ref('accounts/' + myMssv).on('value', snap => {
+        myAccount = snap.val() || {};
+        myBalance = Number(myAccount.balance) || 0;
+        renderBookerInfo();
+    });
+    setInterval(renderBookerInfo, 1000);   // cập nhật đếm ngược thời gian khoá mỗi giây
 
     // Ai được xem danh tính người khác? Admin hoặc tài khoản được cấp quyền Dashboard.
     const canSeeIdentity = (sessionStorage.getItem("user_role") === "admin") || (sessionStorage.getItem("perm_dashboard") === "true");
@@ -216,13 +241,6 @@
         document.getElementById('txtPrice').value = priceLabel(sec);
     }
 
-    function switchFloor(zone) {
-        currentFloor = zone;
-        document.getElementById('ftN1').classList.toggle('active', zone === "N1");
-        document.getElementById('ftN2').classList.toggle('active', zone === "N2");
-        renderPicker();
-    }
-
     function renderPicker() {
         const grid = document.getElementById('pickGrid');
         grid.innerHTML = "";
@@ -235,7 +253,7 @@
             const cls = isSel ? "sel" : st;
             const div = document.createElement('div');
             div.className = "pick " + cls;
-            let label = isSel ? "Đang chọn" : ({available:"Trống",busy:"Có người",reserved:"Đã đặt"}[st] || st);
+            let label = isSel ? "Đang chọn" : ({available:"Trống",busy:"Có người",reserved:"Đang giữ"}[st] || st);
             if (mineHold && !isSel) label = "Của bạn";
             div.innerHTML =
                 `<div class="cap"><i class="ti ti-capsule"></i></div>
@@ -301,6 +319,7 @@
                 timerValue.innerText = "";
                 formArea.classList.remove('hidden');
                 btnConfirm.disabled = false; btnConfirm.classList.remove('hidden'); btnCancel.classList.add('hidden');
+                if (KenBan.blockState(myAccount)) btnConfirm.disabled = true;   // đang bị khoá -> không cho đặt
             }
         } else if (st === "reserved") {
             box.classList.add('reserved');
@@ -309,13 +328,13 @@
             if (mine) {
                 txtStatus.innerText = "Bạn Đã Giữ Chỗ";
                 if (isHardware) {
-                    lblSelection.innerText = "Tới kén N1-01 và đặt điện thoại vào cảm biến (trong 30 giây)";
+                    lblSelection.innerText = "Tới kén " + KEN_HARDWARE_POD + " và đặt điện thoại vào cảm biến (trong " + (kenHoldMs(sessionStorage.getItem("user_role"))/1000) + " giây)";
                 } else {
-                    lblSelection.innerText = "Bấm Check-in để vào kén và bắt đầu đếm ngược (giữ chỗ 30 giây)";
+                    lblSelection.innerText = "Bấm Check-in để vào kén và bắt đầu đếm ngược (giữ chỗ " + (kenHoldMs(sessionStorage.getItem("user_role"))/1000) + " giây)";
                     btnCheckin.classList.remove('hidden');   // kén giả lập: tự check-in trên web
                 }
                 btnCancel.classList.remove('hidden');
-                startHoldCountdown(p.reserveAt);
+                startHoldCountdown(p.reserveAt, p.holdMs);
             } else {
                 txtStatus.innerText = "Đã Có Người Đặt";
                 lblSelection.innerText = canSeeIdentity
@@ -365,11 +384,12 @@
         }, 1000);
     }
 
-    function startHoldCountdown(reserveAt) {
+    function startHoldCountdown(reserveAt, holdMs) {
+        holdMs = holdMs || KEN_RESERVE_HOLD_MS;   // fallback nếu bản ghi cũ chưa có holdMs
         clearInterval(reserveTimer);
         const timerValue = document.getElementById('timerValue');
         function tick() {
-            const left = (reserveAt + KEN_RESERVE_HOLD_MS) - Date.now();
+            const left = (reserveAt + holdMs) - Date.now();
             if (left > 0) {
                 timerValue.innerText = "Thời gian giữ chỗ còn: " + mmss(left);
             } else {
@@ -391,7 +411,9 @@
         KEN_PODS.forEach(id => {
             if (id === KEN_HARDWARE_POD) return; // N1-01 để ESP tự giải phóng (phần cứng)
             const p = currentPods[id];
-            if (p && p.status === "reserved" && p.reserveAt && (p.reserveAt + KEN_RESERVE_HOLD_MS) < now) {
+            if (p && p.status === "reserved" && p.reserveAt && (p.reserveAt + (p.holdMs || KEN_RESERVE_HOLD_MS)) < now) {
+                // Giữ chỗ hết hạn mà không check-in -> tính 1 điểm spam cho người đặt
+                if (p.mssv) KenBan.recordStrike(database, p.mssv, p.reserveAt, id);
                 database.ref('pods/' + id).set({ zone: kenZoneOf(id), status: "available" });
             }
         });
@@ -405,9 +427,6 @@
         // Chọn sẵn kén từ URL nếu hợp lệ & đang trống (chỉ lần đầu)
         if (!selectedPod && urlPod && KEN_PODS.includes(urlPod)) {
             selectedPod = urlPod;
-            currentFloor = kenZoneOf(urlPod);
-            document.getElementById('ftN1').classList.toggle('active', currentFloor === "N1");
-            document.getElementById('ftN2').classList.toggle('active', currentFloor === "N2");
         }
         renderPicker();
         renderSelectedPod();
@@ -425,6 +444,18 @@
         const p = currentPods[selectedPod] || {};
         if (p.status && p.status !== "available") { alert("Kén này vừa có người đặt, vui lòng chọn kén khác!"); return; }
 
+        // Chặn nếu tài khoản đang bị khoá do spam
+        const blk = KenBan.blockState(myAccount);
+        if (blk) { alert(blk.msg); return; }
+
+        // Ví trả trước: phải đủ tiền cho gói đang chọn (Admin được miễn)
+        const giaGoi = kenPriceOf(tempDuration);
+        if (sessionStorage.getItem("user_role") !== "admin" && myBalance < giaGoi) {
+            alert("Số dư không đủ (cần " + giaGoi.toLocaleString('vi-VN') + "đ, còn " +
+                  myBalance.toLocaleString('vi-VN') + "đ). Vui lòng liên hệ Admin nạp thêm!");
+            return;
+        }
+
         // Họ tên & MSSV lấy thẳng từ tài khoản đang đăng nhập
         const name = myName;
         const mssv = myMssv;
@@ -434,7 +465,7 @@
         database.ref('pods/' + selectedPod).set({
             zone: kenZoneOf(selectedPod), status: "reserved",
             user: name, mssv: mssv, duration: tempDuration,
-            reserveAt: now, booking_owner: deviceId
+            reserveAt: now, holdMs: kenHoldMs(sessionStorage.getItem("user_role")), booking_owner: deviceId
         });
 
         // Ghi nhật ký hoạt động (trạng thái giữ chỗ)
@@ -451,6 +482,11 @@
     function huyLenhLapTuc() {
         clearInterval(reserveTimer);
         if (selectedPod) {
+            const p = currentPods[selectedPod];
+            // Huỷ khi đang "reserved" (chưa check-in) -> tính 1 điểm spam cho người đặt
+            if (p && p.status === "reserved" && p.mssv && p.reserveAt) {
+                KenBan.recordStrike(database, p.mssv, p.reserveAt, selectedPod);
+            }
             database.ref('pods/' + selectedPod).set({ zone: kenZoneOf(selectedPod), status: "available" });
         }
         if (activityKey) {
@@ -464,7 +500,7 @@
         const id = selectedPod; if (!id) return;
         const p = currentPods[id]; if (!p || p.status !== "reserved") return;
         if (!isMyPod(p)) return;
-        if (id === KEN_HARDWARE_POD) { alert("Kén N1-01 dùng cảm biến phần cứng, không check-in trên web."); return; }
+        if (id === KEN_HARDWARE_POD) { alert("Kén " + KEN_HARDWARE_POD + " dùng cảm biến phần cứng, không check-in trên web."); return; }
 
         clearInterval(reserveTimer);
         const now = Date.now();
@@ -474,6 +510,8 @@
             pod: id, zone: kenZoneOf(id), user: p.user || myName, mssv: p.mssv || myMssv,
             durationMin: dur, price: kenPriceOf(dur), bookAt: now, checkinAt: now, status: "busy"
         });
+        // Ví: trừ tiền gói khi bắt đầu dùng dịch vụ (1 lần duy nhất theo key kén_giờ-checkin)
+        KenWallet.charge(database, id + '_' + now, p.mssv || myMssv, kenPriceOf(dur));
         activityKey = null; // phiên giữ chỗ đã chuyển sang đang dùng
     }
 
@@ -488,6 +526,11 @@
             pod: id, zone: kenZoneOf(id), user: p.user || "", mssv: p.mssv || "",
             durationMin: Number(p.duration) || 0, price: kenPriceOf(Number(p.duration) || 0),
             bookAt: p.checkinAt || now, checkinAt: p.checkinAt || null, checkoutAt: now, status: "completed"
+        });
+        // Telegram: báo 1 ĐƠN HOÀN THÀNH (chỉ gửi 1 lần theo key)
+        KenWallet.notifyDone(database, id + '_' + (p.checkinAt || now), {
+            pod: id, user: p.user || "", mssv: p.mssv || "",
+            durationSec: Number(p.duration) || 0, price: kenPriceOf(Number(p.duration) || 0), balance: myBalance
         });
     }
 

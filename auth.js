@@ -23,6 +23,34 @@ const KenAuth = (function () {
     // Loại bỏ mọi ký tự đặc biệt, khoảng trắng, dấu tiếng Việt.
     const CREDENTIAL_REGEX = /^[A-Za-z0-9]{1,30}$/;
 
+    // ===== Ghi nhớ đăng nhập 30 ngày =====
+    // Lưu phiên vào localStorage (tồn tại qua việc đóng trình duyệt) kèm hạn dùng.
+    // sessionStorage mất khi đóng tab; localStorage thì không -> dùng để khôi phục phiên.
+    const REMEMBER_KEY = "ken_remember";
+    const REMEMBER_MS = 30 * 24 * 60 * 60 * 1000; // 30 ngày
+    const SESSION_KEYS = ["user_role", "user_name", "user_fullname", "perm_dashboard"];
+
+    // Gọi sau khi đăng nhập thành công (nếu người dùng chọn "Duy trì đăng nhập")
+    function rememberSession() {
+        const data = {};
+        SESSION_KEYS.forEach(k => { const v = sessionStorage.getItem(k); if (v !== null) data[k] = v; });
+        try { localStorage.setItem(REMEMBER_KEY, JSON.stringify({ exp: Date.now() + REMEMBER_MS, data })); } catch (e) {}
+    }
+
+    // Tự chạy khi nạp auth.js: nếu chưa có phiên mà còn bản ghi nhớ chưa hết hạn -> khôi phục
+    function restoreSession() {
+        if (sessionStorage.getItem("user_name")) return; // đã có phiên đang mở
+        try {
+            const raw = localStorage.getItem(REMEMBER_KEY);
+            if (!raw) return;
+            const obj = JSON.parse(raw);
+            if (!obj || !obj.exp || Date.now() > obj.exp) { localStorage.removeItem(REMEMBER_KEY); return; }
+            Object.entries(obj.data || {}).forEach(([k, v]) => sessionStorage.setItem(k, v));
+        } catch (e) { localStorage.removeItem(REMEMBER_KEY); }
+    }
+
+    function clearRemember() { try { localStorage.removeItem(REMEMBER_KEY); } catch (e) {} }
+
     function isValidCredential(str) {
         return typeof str === "string" && CREDENTIAL_REGEX.test(str);
     }
@@ -97,6 +125,7 @@ const KenAuth = (function () {
     }
 
     function logout() {
+        clearRemember();          // xoá ghi nhớ 30 ngày khi chủ động đăng xuất
         sessionStorage.clear();
         window.location.href = "index22.html";
     }
@@ -136,6 +165,9 @@ const KenAuth = (function () {
         }
     }
 
+    // Khôi phục phiên ngay khi nạp auth.js (trước khi trang gọi requireLogin)
+    restoreSession();
+
     return {
         ADMIN_DEFAULT_PASSWORD,
         NEW_USER_DEFAULT_PASSWORD,
@@ -149,6 +181,7 @@ const KenAuth = (function () {
         requireDashboard,
         requireAdmin,
         logout,
+        rememberSession,
         watchPermissions,
         homeUrl,
         goHome,

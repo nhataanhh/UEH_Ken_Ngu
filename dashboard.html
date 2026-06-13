@@ -8,9 +8,10 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-    <script src="auth.js?v=9"></script>
-    <script src="pods.js?v=9"></script>
-    <script src="notify.js?v=8"></script>
+    <script src="auth.js?v=10"></script>
+    <script src="pods.js?v=13"></script>
+    <script src="ken-core.js?v=5"></script>
+    <script src="notify.js?v=10"></script>
     <style>
         :root {
             --bg-main: #f4f5f9;
@@ -20,10 +21,11 @@
             --green: #34c759;
             --yellow: #ff9500;
             --red: #ff3b30;
-            --blue: #007aff;
+            --blue: #0E7C8B;       /* teal UEH (màu chủ đạo) */
+            --orange: #E2762A;     /* cam UEH (màu nhấn) */
             --purple: #5856d6;
-            /* Bộ màu hệ thống Apple (đồng bộ biểu đồ) */
-            --accent-blue: #007aff;
+            /* Bộ màu nhấn (đồng bộ biểu đồ) — theo tông UEH teal/cam */
+            --accent-blue: #0E7C8B;
             --accent-green: #34c759;
             --accent-red: #ff3b30;
             --radius: 16px;
@@ -42,6 +44,7 @@
             display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
             background: var(--bg-card); padding: 16px 24px; border-radius: var(--radius);
             box-shadow: 0 4px 20px rgba(0,0,0,0.02); margin-bottom: 20px;
+            border-top: 4px solid var(--blue);
         }
         .header h1 { margin: 0; font-size: 20px; font-weight: 600; }
         .header p { margin: 4px 0 0 0; font-size: 13px; color: var(--text-sub); }
@@ -151,15 +154,36 @@
         .pill-reserved { background: rgba(255,149,0,0.15); color: var(--yellow); }
         .pill-done { background: rgba(52,199,89,0.15); color: #1d9e54; }
         .pill-cancel { background: rgba(134,134,139,0.15); color: var(--text-sub); }
+
+        /* Modal lịch sử doanh thu theo tháng */
+        .rev-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+        .rev-nav button { border: none; background: var(--bg-main); width: 38px; height: 38px; border-radius: 10px; font-size: 20px; line-height: 1; cursor: pointer; color: var(--blue); font-weight: 700; }
+        .rev-nav button:hover:not(:disabled) { background: rgba(14,124,139,0.12); }
+        .rev-nav button:disabled { opacity: .3; cursor: not-allowed; }
+        .rev-month { font-size: 16px; font-weight: 700; }
+        .rev-total { background: rgba(14,124,139,0.08); color: var(--blue); border-radius: 12px; padding: 12px 14px; font-size: 14px; margin-bottom: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .rev-list { max-height: 340px; overflow: auto; }
+        .rev-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid #f0f0f3; font-size: 13px; }
+        .rev-row:last-child { border-bottom: none; }
+        .rev-row .l { color: var(--text-main); }
+        .rev-row .l small { display: block; color: var(--text-sub); font-size: 11px; margin-top: 2px; }
+        .rev-row .pr { font-weight: 700; color: var(--blue); white-space: nowrap; }
+        .rev-empty { text-align: center; color: var(--text-sub); padding: 24px; font-size: 13px; }
+        .rev-note { text-align: center; color: var(--text-sub); font-size: 11px; margin-top: 12px; }
+        .metric-card.clickable { cursor: pointer; transition: transform .12s, box-shadow .12s; }
+        .metric-card.clickable:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.06); }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="header">
-        <div>
-            <h1><i class="ti ti-dashboard"></i> Bảng Giám Sát Kén Ngủ</h1>
-            <p>Đang đăng nhập: <b id="lblWho">Admin</b> · <span id="lblDate"></span> · Cơ sở Nguyễn Văn Linh</p>
+        <div style="display:flex;align-items:center;gap:14px">
+            <img src="Logo_UEH_xanh.png" alt="UEH University" style="height:46px">
+            <div style="border-left:2px solid #e5e7eb;padding-left:14px">
+                <h1><i class="ti ti-dashboard"></i> Bảng Giám Sát Kén Ngủ</h1>
+                <p>Đang đăng nhập: <b id="lblWho">Admin</b> · <span id="lblDate"></span> · Cơ sở Nguyễn Văn Linh</p>
+            </div>
         </div>
         <div class="header-right">
             <div class="live-status"><div class="pulse-dot"></div> TRỰC TIẾP</div>
@@ -186,18 +210,14 @@
             <div class="card-title"><i class="ti ti-layout-grid"></i> Trạng thái kén theo khu</div>
 
             <div class="zone-block">
-                <div class="zone-head"><i class="ti ti-books"></i> N1 — Thư viện <small>· Tầng 9</small></div>
-                <div class="pod-row" id="podRowN1"></div>
-            </div>
-            <div class="zone-block">
-                <div class="zone-head"><i class="ti ti-school"></i> N2 — Phòng tự học <small>· Tầng trệt</small></div>
+                <div class="zone-head"><i class="ti ti-school"></i> N2 — Phòng tự học <small>· Tầng trệt · 13 kén</small></div>
                 <div class="pod-row" id="podRowN2"></div>
             </div>
 
             <div class="legend">
                 <div class="legend-item"><div class="legend-dot" style="background:#97d8a8"></div> Trống · bấm để đặt</div>
                 <div class="legend-item"><div class="legend-dot" style="background:#f3a39d"></div> Đang dùng</div>
-                <div class="legend-item"><div class="legend-dot" style="background:#f7c777"></div> Đã đặt chỗ</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#f7c777"></div> Đang giữ chỗ</div>
             </div>
         </div>
 
@@ -245,6 +265,7 @@
 
     firebase.initializeApp(KEN_FIREBASE_CONFIG);
     const database = firebase.database();
+    KenTele.init(database);   // theo dõi công tắc Telegram
     KenNotify.init(database); // thông báo pop-up (chỉ Admin)
 
     // Theo dõi quyền realtime: nếu Admin thu hồi quyền Dashboard khi đang xem -> đá về trang đặt
@@ -290,7 +311,7 @@
     })();
 
     // ===== Helpers =====
-    const STATUS_TEXT = { available: "Trống", busy: "Đang dùng", reserved: "Đã đặt" };
+    const STATUS_TEXT = { available: "Trống", busy: "Đang dùng", reserved: "Đang giữ" };
     function fmtTime(ts) {
         if (!ts) return "—";
         const d = new Date(ts);
@@ -312,7 +333,7 @@
             if (typeof p.countdown === "number") return p.countdown * 1000;  // kén phần cứng (ESP gửi lên)
             if (p.endAt) return p.endAt - Date.now();                        // kén giả lập
         }
-        if (p.status === "reserved" && p.reserveAt) return (p.reserveAt + KEN_RESERVE_HOLD_MS) - Date.now();
+        if (p.status === "reserved" && p.reserveAt) return (p.reserveAt + (p.holdMs || KEN_RESERVE_HOLD_MS)) - Date.now();
         return null;
     }
     function isToday(ts) { const d = new Date(ts), n = new Date(); return d.toDateString() === n.toDateString(); }
@@ -320,10 +341,10 @@
 
     // ===== Chỉ số (metrics) có thể bật/tắt =====
     const METRICS = [
-        { key:'total',        label:'Tổng kén',            icon:'ti-box',          color:'var(--blue)',   bg:'rgba(0,122,255,0.1)' },
+        { key:'total',        label:'Tổng kén',            icon:'ti-box',          color:'var(--blue)',   bg:'rgba(14,124,139,0.1)' },
         { key:'available',    label:'Đang trống',          icon:'ti-circle-check', color:'var(--green)',  bg:'rgba(52,199,89,0.1)' },
         { key:'busy',         label:'Đang sử dụng',        icon:'ti-bed',          color:'var(--red)',    bg:'rgba(255,59,48,0.1)' },
-        { key:'reserved',     label:'Đã đặt chỗ (giữ 1′)', icon:'ti-clock',   color:'var(--yellow)', bg:'rgba(255,149,0,0.12)' },
+        { key:'reserved',     label:'Đang đặt giữ 20s',    icon:'ti-clock',   color:'var(--yellow)', bg:'rgba(255,149,0,0.12)' },
         { key:'usageToday',   label:'Lượt dùng hôm nay',   icon:'ti-user-check',  color:'var(--purple)', bg:'rgba(88,86,214,0.1)' },
         { key:'revenueToday', label:'Doanh thu hôm nay',   icon:'ti-cash',        color:'var(--green)',  bg:'rgba(52,199,89,0.1)' },
         { key:'revenueMonth', label:'Doanh thu tháng này', icon:'ti-chart-line',  color:'#1d9e75',       bg:'rgba(29,158,117,0.1)' },
@@ -341,9 +362,16 @@
             const card = document.createElement('div');
             card.className = 'metric-card' + (visibility[m.key] ? '' : ' hidden');
             card.id = 'mc-' + m.key;
+            const hint = (m.key === 'revenueMonth') ? ' <i class="ti ti-chevron-right" style="font-size:11px;vertical-align:middle"></i>' : '';
             card.innerHTML =
                 `<div class="metric-icon" style="background:${m.bg};color:${m.color}"><i class="ti ${m.icon}"></i></div>
-                 <div class="metric-info"><div class="label">${m.label}</div><div class="value" id="mv-${m.key}">—</div></div>`;
+                 <div class="metric-info"><div class="label">${m.label}${hint}</div><div class="value" id="mv-${m.key}">—</div></div>`;
+            // Thẻ "Doanh thu tháng này" -> bấm để xem lịch sử doanh thu theo tháng
+            if (m.key === 'revenueMonth') {
+                card.classList.add('clickable');
+                card.title = 'Bấm để xem lịch sử doanh thu theo tháng';
+                card.onclick = openRevenueThisMonth;
+            }
             grid.appendChild(card);
         });
         // Panel toggle checkboxes
@@ -372,7 +400,7 @@
     // ===== Render kén =====
     let currentPods = {};
     function renderPods() {
-        ['N1', 'N2'].forEach(zone => {
+        ['N2'].forEach(zone => {
             const row = document.getElementById('podRow' + zone);
             row.innerHTML = "";
             KEN_PODS.filter(id => kenZoneOf(id) === zone).forEach(id => {
@@ -420,9 +448,13 @@
             // Kén GIẢ LẬP: hết hạn giữ chỗ 1' mà chưa ai check-in -> tự trả về TRỐNG
             // (chống kẹt "Đã đặt / Hết giữ" mãi khi người đặt rời trang. N1-01 do ESP tự lo.)
             if (isAdmin && p && p.status === "reserved" && id !== KEN_HARDWARE_POD &&
-                p.reserveAt && Date.now() > (p.reserveAt + KEN_RESERVE_HOLD_MS)) {
+                p.reserveAt && Date.now() > (p.reserveAt + (p.holdMs || KEN_RESERVE_HOLD_MS))) {
                 const k = "rel_" + id + "_" + p.reserveAt;
-                if (!autoCheckedOut.has(k)) { autoCheckedOut.add(k); database.ref('pods/' + id).set({ zone: kenZoneOf(id), status: "available" }); }
+                if (!autoCheckedOut.has(k)) {
+                    autoCheckedOut.add(k);
+                    if (p.mssv) KenBan.recordStrike(database, p.mssv, p.reserveAt, id); // giữ chỗ hết hạn không check-in -> điểm spam
+                    database.ref('pods/' + id).set({ zone: kenZoneOf(id), status: "available" });
+                }
             }
         });
     }
@@ -439,7 +471,7 @@
         const r = remainMs(p);
         const stPill = p.status === "busy"
             ? '<span class="pill pill-busy">ĐANG DÙNG</span>'
-            : '<span class="pill pill-reserved">ĐÃ ĐẶT</span>';
+            : '<span class="pill pill-reserved">ĐANG GIỮ</span>';
 
         // Hành động: N1-01 do phần cứng điều khiển; kén giả lập có nút Check-in / Check-out
         let footer = "";
@@ -483,6 +515,8 @@
             pod: id, zone: kenZoneOf(id), user: p.user || "", mssv: p.mssv || "",
             durationMin: dur, price: kenPriceOf(dur), bookAt: now, checkinAt: now, status: "busy"
         });
+        // Ví: trừ tiền gói khi bắt đầu dùng (idempotent theo key)
+        if (p.mssv) KenWallet.charge(database, id + '_' + now, p.mssv, kenPriceOf(dur));
         closeModal();
     }
 
@@ -497,6 +531,11 @@
             pod: id, zone: kenZoneOf(id), user: p.user || "", mssv: p.mssv || "",
             durationMin: Number(p.duration) || 0, price: kenPriceOf(Number(p.duration) || 0),
             bookAt: p.checkinAt || now, checkinAt: p.checkinAt || null, checkoutAt: now, status: "completed"
+        });
+        // Telegram: báo 1 đơn hoàn thành (chỉ 1 lần)
+        KenWallet.notifyDone(database, id + '_' + (p.checkinAt || now), {
+            pod: id, user: p.user || "", mssv: p.mssv || "",
+            durationSec: Number(p.duration) || 0, price: kenPriceOf(Number(p.duration) || 0)
         });
         closeModal();
     }
@@ -515,8 +554,8 @@
     function handleHardwareEvents() {
         const p = currentPods[KEN_HARDWARE_POD]; if (!p) return;
         const st = p.status || "available";
-        // Vào busy + đã có checkinAt -> ghi lượt check-in (1 lần / phiên)
-        if (st === "busy" && p.checkinAt) {
+        // Vào busy + đã có checkinAt + CÓ người đặt -> ghi lượt check-in (1 lần / phiên)
+        if (st === "busy" && p.checkinAt && p.mssv) {
             hwBusy = { checkinAt: p.checkinAt, user: p.user || "", mssv: p.mssv || "", duration: Number(p.duration) || 0 };
             const key = 'in_' + KEN_HARDWARE_POD + '_' + p.checkinAt;
             if (!hwInWritten.has(key)) {
@@ -534,6 +573,11 @@
                 pod: KEN_HARDWARE_POD, zone: kenZoneOf(KEN_HARDWARE_POD), user: hwBusy.user, mssv: hwBusy.mssv,
                 durationMin: hwBusy.duration, price: kenPriceOf(hwBusy.duration),
                 bookAt: hwBusy.checkinAt, checkinAt: hwBusy.checkinAt, checkoutAt: Date.now(), status: "completed"
+            });
+            // Telegram: kén phần cứng hoàn thành 1 đơn
+            KenWallet.notifyDone(database, KEN_HARDWARE_POD + '_' + hwBusy.checkinAt, {
+                pod: KEN_HARDWARE_POD, user: hwBusy.user, mssv: hwBusy.mssv,
+                durationSec: hwBusy.duration, price: kenPriceOf(hwBusy.duration)
             });
             hwBusy = null;
         }
@@ -592,7 +636,7 @@
             completed: '<span class="pill pill-done">HOÀN TẤT</span>',
             cancelled: '<span class="pill pill-cancel">ĐÃ HUỶ</span>',
             busy: '<span class="pill pill-busy">ĐANG DÙNG</span>',
-            reserved: '<span class="pill pill-reserved">ĐÃ ĐẶT</span>',
+            reserved: '<span class="pill pill-reserved">ĐANG GIỮ</span>',
         }[it.status] || it.status;
 
         let used = "—";
@@ -623,7 +667,8 @@
     function ensureUsageLogged() {
         KEN_PODS.forEach(id => {
             const p = currentPods[id];
-            if (!p || p.status !== "busy") return;
+            // Bỏ qua phiên KHÔNG có người đặt (vd kén phần cứng bị kích hoạt mà chưa đặt chỗ) -> tránh đơn rác
+            if (!p || p.status !== "busy" || !p.mssv) return;
             // N1-01 (ESP) không tự ghi checkinAt -> web đóng dấu giúp 1 lần (transaction tránh tranh chấp)
             if (!p.checkinAt) {
                 if (id === KEN_HARDWARE_POD)
@@ -638,12 +683,14 @@
                 pod: id, zone: kenZoneOf(id), user: p.user || "", mssv: p.mssv || "",
                 durationSec: dur, price: kenPriceOf(dur), checkinAt: p.checkinAt
             });
+            // Ví: trừ tiền lượt dùng (bao gồm kén phần cứng N2-01); idempotent nên không trùng với check-in web
+            if (p.mssv) KenWallet.charge(database, key, p.mssv, kenPriceOf(dur));
         });
     }
 
     // 3 gói thuê — màu theo hệ thống Apple
     const PKG = [
-        { sec: 15, label: '15 giây · 4K',  hex: '#007aff' }, // --accent-blue
+        { sec: 20, label: '20 giây · 6K',  hex: '#0E7C8B' }, // --accent-blue
         { sec: 30, label: '30 giây · 8K',  hex: '#34c759' }, // --accent-green
         { sec: 45, label: '45 giây · 10K', hex: '#ff3b30' }, // --accent-red
     ];
@@ -659,8 +706,10 @@
     });
 
     function computeUsageMetrics(today, all) {
-        const revToday = today.reduce((s, it) => s + (it.price || 0), 0);
-        const revMonth = all.filter(it => isThisMonth(it.checkinAt)).reduce((s, it) => s + (it.price || 0), 0);
+        // Doanh thu CHỈ tính từ user thật (có MSSV, không phải Admin, không phải đơn rác rỗng)
+        const isRealUser = it => it.mssv && it.mssv !== "Admin";
+        const revToday = today.filter(isRealUser).reduce((s, it) => s + (it.price || 0), 0);
+        const revMonth = all.filter(it => isThisMonth(it.checkinAt) && isRealUser(it)).reduce((s, it) => s + (it.price || 0), 0);
         const totalSec = today.reduce((s, it) => s + (it.durationSec || 0), 0);
         const avg = today.length ? Math.round(totalSec / today.length) : 0;
 
@@ -682,7 +731,7 @@
         if (hourlyChart) { hourlyChart.data.datasets[0].data = counts; hourlyChart.update(); return; }
         hourlyChart = new Chart(document.getElementById('hourlyChart'), {
             type: 'bar',
-            data: { labels: hours.map(h => h + "h"), datasets: [{ data: counts, backgroundColor: '#007aff', borderRadius: 4, maxBarThickness: 26 }] },
+            data: { labels: hours.map(h => h + "h"), datasets: [{ data: counts, backgroundColor: '#0E7C8B', borderRadius: 4, maxBarThickness: 26 }] },
             options: {
                 responsive: true, maintainAspectRatio: false,
                 plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y + ' lượt' } } },
@@ -691,7 +740,7 @@
         });
     }
 
-    // Biểu đồ tròn: tỷ lệ 3 gói thuê 15s/30s/45s (xanh dương / xanh lá / đỏ)
+    // Biểu đồ tròn: tỷ lệ 3 gói thuê 20s/30s/45s (xanh dương / xanh lá / đỏ)
     function renderPackageChart(today) {
         const counts = PKG.map(pk => today.filter(it => Number(it.durationSec) === pk.sec).length);
         const total = counts.reduce((a, b) => a + b, 0);
@@ -709,6 +758,56 @@
                 plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.label}: ${c.parsed} lượt` } } }
             }
         });
+    }
+
+    // ===== Lịch sử doanh thu theo tháng =====
+    // Tháng hệ thống bắt đầu có dữ liệu — các tháng TRƯỚC đó bị khoá (chưa có data).
+    const APP_LAUNCH = new Date(2026, 5, 1); // tháng 6/2026
+    function monthIdx(y, m) { return y * 12 + m; }
+
+    function openRevenueThisMonth() { const n = new Date(); openRevenueMonth(n.getFullYear(), n.getMonth()); }
+
+    function openRevenueMonth(y, m) {
+        const now = new Date();
+        const launchIdx = monthIdx(APP_LAUNCH.getFullYear(), APP_LAUNCH.getMonth());
+        const curIdx = monthIdx(now.getFullYear(), now.getMonth());
+        let idx = monthIdx(y, m);
+        // Chặn ra ngoài khoảng [tháng tạo web .. tháng hiện tại]
+        if (idx < launchIdx) { y = APP_LAUNCH.getFullYear(); m = APP_LAUNCH.getMonth(); idx = launchIdx; }
+        if (idx > curIdx)   { y = now.getFullYear();         m = now.getMonth();         idx = curIdx; }
+
+        const start = new Date(y, m, 1).getTime();
+        const end   = new Date(y, m + 1, 1).getTime();
+        const items = Object.values(usageData)
+            .filter(it => it.checkinAt >= start && it.checkinAt < end && it.mssv && it.mssv !== "Admin")
+            .sort((a, b) => b.checkinAt - a.checkinAt);
+        const total = items.reduce((s, it) => s + (it.price || 0), 0);
+
+        const canPrev = idx > launchIdx;
+        const canNext = idx < curIdx;
+        const prev = new Date(y, m - 1, 1), next = new Date(y, m + 1, 1);
+
+        const list = items.length
+            ? items.map(it =>
+                `<div class="rev-row">
+                    <span class="l">${escapeHtml(it.user || "—")} · ${escapeHtml(it.pod || "")}
+                        <small>${fmtTime(it.checkinAt)} · ${it.durationSec || 0} giây · MSSV ${escapeHtml(it.mssv || "—")}</small>
+                    </span>
+                    <span class="pr">${(it.price || 0).toLocaleString('vi-VN')}đ</span>
+                 </div>`).join("")
+            : `<div class="rev-empty">Chưa có lượt dùng nào trong tháng này.</div>`;
+
+        document.getElementById('modalTitle').textContent = "Lịch sử doanh thu";
+        document.getElementById('modalBody').innerHTML =
+            `<div class="rev-nav">
+                <button onclick="openRevenueMonth(${prev.getFullYear()},${prev.getMonth()})" ${canPrev ? '' : 'disabled'} title="Tháng trước">‹</button>
+                <div class="rev-month">Tháng ${m + 1}/${y}</div>
+                <button onclick="openRevenueMonth(${next.getFullYear()},${next.getMonth()})" ${canNext ? '' : 'disabled'} title="Tháng sau">›</button>
+             </div>
+             <div class="rev-total"><i class="ti ti-cash"></i> Tổng doanh thu: <b>${total.toLocaleString('vi-VN')}đ</b> · ${items.length} lượt</div>
+             <div class="rev-list">${list}</div>
+             <div class="rev-note">Dữ liệu bắt đầu từ tháng ${APP_LAUNCH.getMonth() + 1}/${APP_LAUNCH.getFullYear()} — các tháng trước đó chưa có dữ liệu.</div>`;
+        document.getElementById('overlay').classList.add('open');
     }
 
     // ===== Modal =====

@@ -29,6 +29,25 @@ Hệ thống đặt chỗ "kén ngủ" cho thư viện / phòng tự học, gồ
 - Firebase Hosting (`kennguv.web.app`).
 - ESP32 + thư viện **Firebase Arduino Client Library for ESP8266 and ESP32** (tác giả Mobizt).
 
+## ⚙️ Hướng dẫn cấu hình (Dành cho người clone/fork project)
+
+Nếu bạn tải project này về để sử dụng hoặc phát triển thêm, bạn cần thay đổi các thông tin kết nối dưới đây để liên kết với tài nguyên của riêng bạn:
+
+**1. Cấu hình Firebase Database (Web)**
+- Mở file `auth.js`.
+- Tìm biến `KEN_FIREBASE_CONFIG` và thay đổi `databaseURL` sang đường dẫn Firebase Realtime Database của bạn.
+
+**2. Cấu hình Telegram Bot (Nhận thông báo)**
+- Mở file `ken-core.js`.
+- Tìm biến `KEN_TELEGRAM`.
+- Đổi `token` thành Token Bot của bạn (được cấp bởi BotFather).
+- Đổi `chatId` thành ID nhóm hoặc cá nhân bạn muốn nhận thông báo.
+
+**3. Cấu hình Mạch ESP32**
+- Mở file `esp32_ken_N1-01/esp32_ken_N1-01.ino`.
+- Cập nhật `WIFI_SSID` và `WIFI_PASSWORD` bằng thông tin WiFi nhà/phòng lab của bạn.
+- Cập nhật `FIREBASE_HOST` và `FIREBASE_AUTH` tương ứng với Firebase của bạn (Lưu ý: phần host bỏ qua `https://` và dấu `/` ở cuối).
+
 ## Chạy / sửa giao diện
 
 Đây là web tĩnh, **không cần cài đặt gì**. Mở thẳng file `.html` bằng trình duyệt, hoặc chạy server tĩnh:

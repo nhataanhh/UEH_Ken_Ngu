@@ -10,8 +10,8 @@
 #define FIREBASE_HOST "kennguv-default-rtdb.asia-southeast1.firebasedatabase.app"
 #define FIREBASE_AUTH "test_mode_secret"   // database secret bất kỳ (rules đang mở)
 
-// Node riêng cho kén phần cứng N1-01 (9 kén còn lại là giả lập, check-in tay trên web)
-#define POD_PATH "/pods/N1-01"
+// Node riêng cho kén phần cứng N2-01 (12 kén còn lại là giả lập, check-in tay trên web)
+#define POD_PATH "/pods/N2-01"
 
 // 2. CHÂN PHẦN CỨNG
 const int chanCamBien   = 25;
@@ -30,14 +30,14 @@ FirebaseConfig config;
 String kenStatus     = "available";
 String lastKenStatus = "available";
 String trangThaiInGanNhat = "";
-int    duration      = 15;
+int    duration      = 20;
 
 // Các mốc thời gian (millis) để chạy KHÔNG-BLOCKING -> không đơ/giật
 unsigned long thoiGianQuetMang      = 0;
 unsigned long thoiGianBatCamBien    = 0;
 unsigned long thoiGianBatDauDemNguoc = 0;
 unsigned long thoiGianBatDauGiuCho  = 0;
-const unsigned long GIU_CHO_TOI_DA_MS = 35000;   // tự huỷ giữ chỗ sau 35s nếu không ai đặt ĐT (web giữ 30s)
+unsigned long giuChoMs = 30000;   // hạn giữ chỗ (ms) đọc từ web theo vai trò người đặt (admin 20s / user 30s)
 int  lastCountdownPushed = -1;
 bool dangChoQuayServo    = false;
 
@@ -116,6 +116,10 @@ void loop() {
       if (Firebase.RTDB.getInt(&fbdo, String(POD_PATH) + "/duration")) {
         if (fbdo.dataType() == "int") duration = fbdo.intData();
       }
+      // Hạn giữ chỗ (ms) theo vai trò người đặt — web ghi lên; mặc định 30000 nếu thiếu
+      if (Firebase.RTDB.getInt(&fbdo, String(POD_PATH) + "/holdMs")) {
+        if (fbdo.dataType() == "int" && fbdo.intData() > 0) giuChoMs = (unsigned long)fbdo.intData();
+      }
       if (kenStatus != trangThaiInGanNhat) {
         trangThaiInGanNhat = kenStatus;
         Serial.print(">> Web bao trang thai: "); Serial.print(kenStatus);
@@ -134,7 +138,7 @@ void loop() {
       digitalWrite(chanLedBlynk, LOW);
       cuaKen.write(0);
       thoiGianBatDauGiuCho = millis();   // bắt đầu đếm hạn giữ chỗ
-      Serial.println("==> DA DAT KEN N1-01: Len den VANG lap tuc!");
+      Serial.println("==> DA DAT KEN N2-01: Len den VANG lap tuc!");
     }
     lastKenStatus = kenStatus;
   }
@@ -157,7 +161,7 @@ void loop() {
       kichHoatKhoaKen();
     }
     // Tự giải phóng nếu giữ chỗ quá hạn mà không ai đặt ĐT vào (chống kẹt "Đã đặt" mãi)
-    else if (millis() - thoiGianBatDauGiuCho > GIU_CHO_TOI_DA_MS) {
+    else if (millis() - thoiGianBatDauGiuCho > giuChoMs + 5000UL) {
       traVeTrong("Het han giu cho, khong ai dat DT vao");
     }
   }
@@ -185,7 +189,7 @@ void loop() {
         if (conLai != lastCountdownPushed) {
           lastCountdownPushed = conLai;
           if (Firebase.ready()) Firebase.RTDB.setInt(&fbdo, String(POD_PATH) + "/countdown", conLai);
-          Serial.printf("Ken N1-01 con lai: %d giay\n", conLai);
+          Serial.printf("Ken N2-01 con lai: %d giay\n", conLai);
         }
       } else {
         traVeTrong("Het gio ngu");
@@ -216,5 +220,5 @@ void kichHoatKhoaKen() {
 
   thoiGianBatCamBien = millis();
   dangChoQuayServo = true;
-  Serial.println("==> CAM BIEN KICH HOAT KEN N1-01! Chuyen mau DO.");
+  Serial.println("==> CAM BIEN KICH HOAT KEN N2-01! Chuyen mau DO.");
 }

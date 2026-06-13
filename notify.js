@@ -11,7 +11,7 @@ const KenNotify = (function () {
         if (styled) return; styled = true;
         const css =
         '#ken-toast-wrap{position:fixed;top:18px;right:18px;z-index:99999;display:flex;flex-direction:column;gap:10px;max-width:340px}' +
-        '.ken-toast{background:#fff;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:12px 14px;display:flex;gap:10px;align-items:flex-start;border-left:4px solid #007aff;animation:kenToastIn .25s ease;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}' +
+        '.ken-toast{background:#fff;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:12px 14px;display:flex;gap:10px;align-items:flex-start;border-left:4px solid #0E7C8B;animation:kenToastIn .25s ease;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}' +
         '.ken-toast.out{animation:kenToastOut .35s ease forwards}' +
         '.ken-toast .kt-ic{font-size:20px;margin-top:1px}' +
         '.ken-toast .kt-title{font-size:14px;font-weight:700;color:#1c1c1e}' +
@@ -34,7 +34,7 @@ const KenNotify = (function () {
             case 'cancelled': return { t: 'Đã hủy giữ chỗ', c: '#86868b', i: 'ti-trash-x' };
             case 'busy':      return { t: 'Đã check-in',    c: '#ff3b30', i: 'ti-login-2' };
             case 'completed': return { t: 'Đã check-out',   c: '#34c759', i: 'ti-logout-2' };
-            default:          return { t: status || 'Cập nhật', c: '#007aff', i: 'ti-bell' };
+            default:          return { t: status || 'Cập nhật', c: '#0E7C8B', i: 'ti-bell' };
         }
     }
 
