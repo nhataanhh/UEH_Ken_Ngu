@@ -7,8 +7,8 @@
 
 // ===== Cấu hình Telegram =====
 const KEN_TELEGRAM = {
-    token:  "8649637780:AAFCABsuFTXJ6LWGPZFUNL-OBkTreVZWGbg",
-    chatId: "-5198166728"
+    token:  "",
+    chatId: ""
 };
 
 const KenTele = (function () {
