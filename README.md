@@ -1,4 +1,5 @@
 # Kén Ngủ V2 — Hệ thống đặt kén ngủ thông minh
+Tài khoản : Admin - Mật khẩu : A@a123
 
 Hệ thống đặt chỗ "kén ngủ" cho thư viện / phòng tự học, gồm **web app** (HTML/JS + Firebase Realtime Database) và **phần cứng ESP32** điều khiển 1 kén thật.
 
